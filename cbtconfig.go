@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD
 Copyright 2015 Google LLC
+=======
+Copyright 2015 Google Inc. All Rights Reserved.
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,31 +18,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+<<<<<<< HEAD
 package main
+=======
+// Package cbtconfig encapsulates common code for reading configuration from .cbtrc and gcloud.
+package cbtconfig
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 
 import (
 	"bufio"
 	"bytes"
+<<<<<<< HEAD
 	"crypto/tls"
 	"crypto/x509"
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+<<<<<<< HEAD
+=======
+	"os/exec"
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
+<<<<<<< HEAD
 	"golang.org/x/sys/execabs"
 	"google.golang.org/grpc/credentials"
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 )
 
 // Config represents a configuration.
 type Config struct {
+<<<<<<< HEAD
 	Project, Instance string                           // required
 	Creds             string                           // optional
 	AdminEndpoint     string                           // optional
@@ -64,10 +84,28 @@ const (
 	// ProjectAndInstanceRequired specifies that both -project and -instance is required.
 	ProjectAndInstanceRequired = ProjectRequired | InstanceRequired
 )
+=======
+	Project, Instance string             // required
+	Creds             string             // optional
+	AdminEndpoint     string             // optional
+	DataEndpoint      string             // optional
+	TokenSource       oauth2.TokenSource // derived
+}
+
+type RequiredFlags uint
+
+const NoneRequired RequiredFlags = 0
+const (
+	ProjectRequired RequiredFlags = 1 << iota
+	InstanceRequired
+)
+const ProjectAndInstanceRequired RequiredFlags = ProjectRequired | InstanceRequired
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 
 // RegisterFlags registers a set of standard flags for this config.
 // It should be called before flag.Parse.
 func (c *Config) RegisterFlags() {
+<<<<<<< HEAD
 	flag.StringVar(&c.Project, "project", c.Project, "project ID. If unset uses gcloud configured project")
 	flag.StringVar(&c.Instance, "instance", c.Instance, "Cloud Bigtable instance")
 	flag.StringVar(&c.Creds, "creds", c.Creds, "Path to the credentials file. If set, uses the application credentials in this file")
@@ -78,11 +116,19 @@ func (c *Config) RegisterFlags() {
 	flag.StringVar(&c.AuthToken, "auth-token", c.AuthToken, "if set, use IAM Auth Token for requests")
 	flag.DurationVar(&c.Timeout, "timeout", c.Timeout,
 		"Timeout (e.g. 10s, 100ms, 5m )")
+=======
+	flag.StringVar(&c.Project, "project", c.Project, "project ID, if unset uses gcloud configured project")
+	flag.StringVar(&c.Instance, "instance", c.Instance, "Cloud Bigtable instance")
+	flag.StringVar(&c.Creds, "creds", c.Creds, "if set, use application credentials in this file")
+	flag.StringVar(&c.AdminEndpoint, "admin-endpoint", c.AdminEndpoint, "Override the admin api endpoint")
+	flag.StringVar(&c.DataEndpoint, "data-endpoint", c.DataEndpoint, "Override the data api endpoint")
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 }
 
 // CheckFlags checks that the required config values are set.
 func (c *Config) CheckFlags(required RequiredFlags) error {
 	var missing []string
+<<<<<<< HEAD
 	if c.CertFile != "" {
 		b, err := ioutil.ReadFile(c.CertFile)
 		if err != nil {
@@ -96,6 +142,8 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 
 		c.TLSCreds = credentials.NewTLS(&tls.Config{RootCAs: cp})
 	}
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	if required != NoneRequired {
 		c.SetFromGcloud()
 	}
@@ -106,7 +154,11 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 		missing = append(missing, "-instance")
 	}
 	if len(missing) > 0 {
+<<<<<<< HEAD
 		return fmt.Errorf("missing %s", strings.Join(missing, " and "))
+=======
+		return fmt.Errorf("Missing %s", strings.Join(missing, " and "))
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	}
 	return nil
 }
@@ -127,6 +179,7 @@ func Load() (*Config, error) {
 		if os.IsNotExist(err) {
 			return &Config{}, nil
 		}
+<<<<<<< HEAD
 		return nil, fmt.Errorf("reading %s: %v", filename, err)
 	}
 	s := bufio.NewScanner(bytes.NewReader(data))
@@ -144,11 +197,26 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 		i := strings.Index(line, "=")
 		if i < 0 {
 			return nil, fmt.Errorf("bad line in %s: %q", filename, line)
+=======
+		return nil, fmt.Errorf("Reading %s: %v", filename, err)
+	}
+	c := new(Config)
+	s := bufio.NewScanner(bytes.NewReader(data))
+	for s.Scan() {
+		line := s.Text()
+		i := strings.Index(line, "=")
+		if i < 0 {
+			return nil, fmt.Errorf("Bad line in %s: %q", filename, line)
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 		}
 		key, val := strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+1:])
 		switch key {
 		default:
+<<<<<<< HEAD
 			return nil, fmt.Errorf("unknown key in %s: %q", filename, key)
+=======
+			return nil, fmt.Errorf("Unknown key in %s: %q", filename, key)
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 		case "project":
 			c.Project = val
 		case "instance":
@@ -159,6 +227,7 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 			c.AdminEndpoint = val
 		case "data-endpoint":
 			c.DataEndpoint = val
+<<<<<<< HEAD
 		case "cert-file":
 			c.CertFile = val
 		case "user-agent":
@@ -171,24 +240,35 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 				return nil, err
 			}
 			c.Timeout = timeout
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 		}
 
 	}
 	return c, s.Err()
 }
 
+<<<<<<< HEAD
 // GcloudCredential holds gcloud credential information.
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 type GcloudCredential struct {
 	AccessToken string    `json:"access_token"`
 	Expiry      time.Time `json:"token_expiry"`
 }
 
+<<<<<<< HEAD
 // Token creates an oauth2 token using gcloud credentials.
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 func (cred *GcloudCredential) Token() *oauth2.Token {
 	return &oauth2.Token{AccessToken: cred.AccessToken, TokenType: "Bearer", Expiry: cred.Expiry}
 }
 
+<<<<<<< HEAD
 // GcloudConfig holds gcloud configuration values.
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 type GcloudConfig struct {
 	Configuration struct {
 		Properties struct {
@@ -200,8 +280,11 @@ type GcloudConfig struct {
 	Credential GcloudCredential `json:"credential"`
 }
 
+<<<<<<< HEAD
 // GcloudCmdTokenSource holds the comamnd arguments. It is only intended to be set by the program.
 // TODO(deklerk): Can this be unexported?
+=======
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 type GcloudCmdTokenSource struct {
 	Command string
 	Args    []string
@@ -219,16 +302,30 @@ func (g *GcloudCmdTokenSource) Token() (*oauth2.Token, error) {
 // LoadGcloudConfig retrieves the gcloud configuration values we need use via the
 // 'config-helper' command
 func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, error) {
+<<<<<<< HEAD
 	out, err := execabs.Command(gcloudCmd, gcloudCmdArgs...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve gcloud configuration")
+=======
+	out, err := exec.Command(gcloudCmd, gcloudCmdArgs...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("Could not retrieve gcloud configuration")
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	}
 
 	var gcloudConfig GcloudConfig
 	if err := json.Unmarshal(out, &gcloudConfig); err != nil {
+<<<<<<< HEAD
 		return nil, fmt.Errorf("could not parse gcloud configuration")
 	}
 
+=======
+		return nil, fmt.Errorf("Could not parse gcloud configuration")
+	}
+
+	log.Printf("Retrieved gcloud configuration, active project is \"%s\"",
+		gcloudConfig.Configuration.Properties.Core.Project)
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 	return &gcloudConfig, nil
 }
 
@@ -266,9 +363,13 @@ func (c *Config) SetFromGcloud() error {
 		return err
 	}
 
+<<<<<<< HEAD
 	if c.Project == "" && gcloudConfig.Configuration.Properties.Core.Project != "" {
 		log.Printf("gcloud active project is \"%s\"",
 			gcloudConfig.Configuration.Properties.Core.Project)
+=======
+	if c.Project == "" {
+>>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 		c.Project = gcloudConfig.Configuration.Properties.Core.Project
 	}
 

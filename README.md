@@ -19,7 +19,7 @@ than the official one) invoke it with the directory prefix like this:
 ## Documentation
 
 This tool gets documented on the [Go packages website](https://pkg.go.dev/cloud.google.com/go/bigtable/cmd/cbt)
-as well as the [cloud site](https://cloud.google.com/bigtable/docs/cbt-reference).
+as well as [cloud.google.com](https://cloud.google.com/bigtable/docs/cbt-reference).
 
 ### Go Package Documentation
 

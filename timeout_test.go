@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
-	"cloud.google.com/go/bigtable/internal/cbtconfig"
 )
 
 type ctxTable struct {

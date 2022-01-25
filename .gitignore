@@ -1,0 +1,15 @@
+# Editors
+.idea
+.vscode
+*.swp
+.history
+
+# Test files
+*.test
+coverage.txt
+
+# Other
+.DS_Store
+
+# Build artifacts
+cloud-bigtable-cbt-cli

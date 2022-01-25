@@ -43,7 +43,7 @@ func TestTimeout(t *testing.T) {
 	table = &ctxt
 	defer func() { table = nil }()
 
-	config := cbtconfig.Config{Creds: "c", Project: "p", Instance: "i"}
+	config := Config{Creds: "c", Project: "p", Instance: "i"}
 	captureStdout(func() { doMain(&config, []string{"count", "mytable"}) })
 
 	_, deadlineSet := ctxt.ctx.Deadline()

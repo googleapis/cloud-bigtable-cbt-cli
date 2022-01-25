@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package cbtconfig encapsulates common code for reading configuration from .cbtrc and gcloud.
-package cbtconfig
+package main
 
 import (
 	"bufio"

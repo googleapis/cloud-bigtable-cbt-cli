@@ -13,7 +13,7 @@ That will build the cbt binary in that directory. To run commands with the `cbt`
 than the official one) invoke it with the directory prefix like this:
 
 ```
-./cbt help
+./cloud-bigtable-cbt-cli help
 ```
 
 ## Documentation

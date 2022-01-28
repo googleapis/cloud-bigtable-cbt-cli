@@ -1,4 +1,4 @@
-module cloud.google.com/cloud-bigtable-cbt-cli
+module cloud.google.com/cbt
 
 go 1.17
 

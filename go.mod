@@ -1,4 +1,4 @@
-module cloud.google.com/cbt
+module cloud.google.com/go/cbt
 
 go 1.17
 

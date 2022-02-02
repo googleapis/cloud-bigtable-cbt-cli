@@ -105,20 +105,6 @@ testAllModules() {
   done
 }
 
-# testChangedModules runs tests in changed modules only.
-testChangedModules() {
-  for d in $CHANGED_DIRS; do
-    goDirectories="$(find "$d" -name "*.go" -printf "%h\n" | sort -u)"
-    if [[ -n "$goDirectories" ]]; then
-      for gd in $goDirectories; do
-        pushd "$gd" > /dev/null;
-          runDirectoryTests .
-        popd > /dev/null;
-      done
-    fi
-  done
-}
-
 set +e # Run all tests, don't stop after the first failure.
 exit_code=0
 
@@ -134,23 +120,6 @@ if [[ $KOKORO_JOB_NAME == *"continuous"* ]]; then
   else
     runDirectoryTests . # Always run base tests.
     echo "Running tests only in changed submodules: $CHANGED_DIRS"
-    testChangedModules
-  fi
-elif [[ $KOKORO_JOB_NAME == *"nightly"* ]]; then
-  # Expected job name format: ".../nightly/[OPTIONAL_MODULE_NAME]/[OPTIONAL_JOB_NAMES...]"
-  ARR=(${KOKORO_JOB_NAME//// }) # Splits job name by "/" where ARR[0] is expected to be "nightly".
-  SUBMODULE_NAME=${ARR[5]} # Gets the token after "nightly/".
-  if [[ -n $SUBMODULE_NAME ]] && [[ -d "./$SUBMODULE_NAME" ]]; then
-    # Only run tests in the submodule designated in the Kokoro job name.
-    # Expected format example: ...cloud-bigtable-cbt-cli/nightly/logging.
-    runDirectoryTests . # Always run base tests
-    echo "Running tests in one submodule: $SUBMODULE_NAME"
-    pushd $SUBMODULE_NAME > /dev/null;
-      runDirectoryTests
-    popd > /dev/null
-  else
-    # Run all tests if it is a regular nightly job.
-    testAllModules
   fi
 else
   testAllModules

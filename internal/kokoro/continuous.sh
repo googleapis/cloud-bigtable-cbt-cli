@@ -36,7 +36,6 @@ export GCLOUD_TESTS_GOLANG_KEY=$GOOGLE_APPLICATION_CREDENTIALS
 # Bigtable integration tests expect an existing instance and cluster
 #  ❯ cbt createinstance gc-bt-it-instance gc-bt-it-instance \
 #    gc-bt-it-cluster us-west1-b 1 SSD
-export GCLOUD_TESTS_BIGTABLE_KEYRING=projects/dulcet-port-762/locations/us-central1/keyRings/go-integration-test-regional
 export GCLOUD_TESTS_BIGTABLE_CLUSTER="gc-bt-it-cluster"
 export GCLOUD_TESTS_BIGTABLE_INSTANCE="gc-bt-it-instance"
 

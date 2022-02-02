@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019 Google LLC
+# Copyright 2022 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,15 +26,15 @@ cd github/cloud-bigtable-cbt-cli
 
 go version
 
-export GOCLOUD_HOME=$KOKORO_ARTIFACTS_DIR/cloud-bigtable-cbt-cli/
+export CBT_HOME=$KOKORO_ARTIFACTS_DIR/cloud-bigtable-cbt-cli/
 export PATH="$GOPATH/bin:$PATH"
 export GO111MODULE=on
 export GOPROXY=https://proxy.golang.org
 
 # Move code into artifacts dir
-mkdir -p $GOCLOUD_HOME
-git clone . $GOCLOUD_HOME
-cd $GOCLOUD_HOME
+mkdir -p $CBT_HOME
+git clone . $CBT_HOME
+cd $CBT_HOME
 
 try3() { eval "$*" || eval "$*" || eval "$*"; }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019 Google LLC
+# Copyright 2022 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,9 +31,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=$KOKORO_KEYSTORE_DIR/72523_go_integration_
 
 export GCLOUD_TESTS_GOLANG_PROJECT_ID=dulcet-port-762
 export GCLOUD_TESTS_GOLANG_KEY=$GOOGLE_APPLICATION_CREDENTIALS
-export GCLOUD_TESTS_API_KEY=`cat $KOKORO_KEYSTORE_DIR/72523_go_gcloud_tests_api_key`
-export GCLOUD_TESTS_GOLANG_KEYRING=projects/dulcet-port-762/locations/us/keyRings/go-integration-test
-export GCLOUD_TESTS_GOLANG_PROFILER_ZONE="us-west1-b"
+
 
 # Bigtable integration tests expect an existing instance and cluster
 #  ❯ cbt createinstance gc-bt-it-instance gc-bt-it-instance \

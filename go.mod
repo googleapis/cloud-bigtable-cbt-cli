@@ -1,4 +1,4 @@
-module cloud.google.com/cloud-bigtable-cbt-cli
+module cloud.google.com/go/cbt
 
 go 1.17
 
@@ -7,9 +7,9 @@ require (
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 	google.golang.org/api v0.65.0
-	google.golang.org/grpc v1.43.0
+	google.golang.org/grpc v1.44.0
 )
 
 require (

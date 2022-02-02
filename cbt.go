@@ -214,7 +214,7 @@ func init() {
 }
 
 const configHelp = `
-Alpha features are not currently available to most Cloud Bigtable customers. Alpha
+Preview features are not currently available to most Cloud Bigtable customers. Alpha
 features might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
@@ -949,7 +949,7 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go -o cbtdoc.go doc
 
 /*
 ` + docIntroTemplate + `

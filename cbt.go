@@ -64,6 +64,8 @@ type tableLike interface {
 }
 
 func getCredentialOpts(opts []option.ClientOption) []option.ClientOption {
+	t := ""
+	_ = t
 	if ts := config.TokenSource; ts != nil {
 		opts = append(opts, option.WithTokenSource(ts))
 	}

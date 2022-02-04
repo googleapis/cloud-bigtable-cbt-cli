@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -380,7 +381,7 @@ func setupEmulator(t *testing.T, tables, families []string) (context.Context, *b
 
 	ctx := context.Background()
 
-	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(srv.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Error %s", err)
 	}

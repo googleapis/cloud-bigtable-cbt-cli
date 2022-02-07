@@ -86,12 +86,12 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 	if c.CertFile != "" {
 		b, err := ioutil.ReadFile(c.CertFile)
 		if err != nil {
-			return fmt.Errorf("Failed to load certificates from %s: %v", c.CertFile, err)
+			return fmt.Errorf("failed to load certificates from %s: %v", c.CertFile, err)
 		}
 
 		cp := x509.NewCertPool()
 		if !cp.AppendCertsFromPEM(b) {
-			return fmt.Errorf("Failed to append certificates from %s", c.CertFile)
+			return fmt.Errorf("failed to append certificates from %s", c.CertFile)
 		}
 
 		c.TLSCreds = credentials.NewTLS(&tls.Config{RootCAs: cp})
@@ -106,7 +106,7 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 		missing = append(missing, "-instance")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("Missing %s", strings.Join(missing, " and "))
+		return fmt.Errorf("missing %s", strings.Join(missing, " and "))
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func Load() (*Config, error) {
 		if os.IsNotExist(err) {
 			return &Config{}, nil
 		}
-		return nil, fmt.Errorf("Reading %s: %v", filename, err)
+		return nil, fmt.Errorf("reading %s: %v", filename, err)
 	}
 	s := bufio.NewScanner(bytes.NewReader(data))
 	return readConfig(s, filename)
@@ -143,12 +143,12 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 		}
 		i := strings.Index(line, "=")
 		if i < 0 {
-			return nil, fmt.Errorf("Bad line in %s: %q", filename, line)
+			return nil, fmt.Errorf("bad line in %s: %q", filename, line)
 		}
 		key, val := strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+1:])
 		switch key {
 		default:
-			return nil, fmt.Errorf("Unknown key in %s: %q", filename, key)
+			return nil, fmt.Errorf("unknown key in %s: %q", filename, key)
 		case "project":
 			c.Project = val
 		case "instance":
@@ -221,12 +221,12 @@ func (g *GcloudCmdTokenSource) Token() (*oauth2.Token, error) {
 func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, error) {
 	out, err := execabs.Command(gcloudCmd, gcloudCmdArgs...).Output()
 	if err != nil {
-		return nil, fmt.Errorf("Could not retrieve gcloud configuration")
+		return nil, fmt.Errorf("could not retrieve gcloud configuration")
 	}
 
 	var gcloudConfig GcloudConfig
 	if err := json.Unmarshal(out, &gcloudConfig); err != nil {
-		return nil, fmt.Errorf("Could not parse gcloud configuration")
+		return nil, fmt.Errorf("could not parse gcloud configuration")
 	}
 
 	return &gcloudConfig, nil

@@ -1282,7 +1282,7 @@ func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {
 	case "HDD":
 		return bigtable.HDD, nil
 	}
-	return -1, fmt.Errorf("Invalid storage type: %v, must be SSD or HDD", storageTypeStr)
+	return -1, fmt.Errorf("invalid storage type: %v, must be SSD or HDD", storageTypeStr)
 }
 
 func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
@@ -1786,11 +1786,11 @@ func parseArgs(args []string, valid []string) (map[string]string, error) {
 	for _, arg := range args {
 		i := strings.Index(arg, "=")
 		if i < 0 {
-			return nil, fmt.Errorf("Bad arg %q", arg)
+			return nil, fmt.Errorf("bad arg %q", arg)
 		}
 		key, val := arg[:i], arg[i+1:]
 		if !stringInSlice(key, valid) {
-			return nil, fmt.Errorf("Unknown arg key %q", key)
+			return nil, fmt.Errorf("unknown arg key %q", key)
 		}
 		parsed[key] = val
 	}
@@ -1842,7 +1842,7 @@ func columnFilter(column string) (bigtable.Filter, error) {
 			return bigtable.ChainFilters(familyFilter, qualifierFilter), nil
 		}
 	} else {
-		return nil, fmt.Errorf("Bad format for column %q", column)
+		return nil, fmt.Errorf("bad format for column %q", column)
 	}
 }
 

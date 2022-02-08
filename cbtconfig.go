@@ -77,9 +77,13 @@ type Config struct {
 	DataEndpoint      string                           // optional
 	CertFile          string                           // optional
 <<<<<<< HEAD
+<<<<<<< HEAD
 	UserAgent         string                           // optional
 	AuthToken         string                           // optional
 	Timeout           time.Duration                    // optional
+=======
+	UserAgent         string                           // optional
+>>>>>>> d792c7b28 (bigtable/cmd/cbt: set distinct configurable user agent for CLI)
 	TokenSource       oauth2.TokenSource               // derived
 	TLSCreds          credentials.TransportCredentials // derived
 }
@@ -143,7 +147,11 @@ func (c *Config) RegisterFlags() {
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 =======
 	flag.StringVar(&c.CertFile, "cert-file", c.CertFile, "Override the TLS certificates file")
+<<<<<<< HEAD
 >>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
+=======
+	flag.StringVar(&c.UserAgent, "user-agent", c.UserAgent, "Override the user agent string")
+>>>>>>> d792c7b28 (bigtable/cmd/cbt: set distinct configurable user agent for CLI)
 }
 
 // CheckFlags checks that the required config values are set.
@@ -263,10 +271,14 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 		case "data-endpoint":
 			c.DataEndpoint = val
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> d792c7b28 (bigtable/cmd/cbt: set distinct configurable user agent for CLI)
 		case "cert-file":
 			c.CertFile = val
 		case "user-agent":
 			c.UserAgent = val
+<<<<<<< HEAD
 		case "auth-token":
 			c.AuthToken = val
 		case "timeout":
@@ -277,6 +289,8 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 			c.Timeout = timeout
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> d792c7b28 (bigtable/cmd/cbt: set distinct configurable user agent for CLI)
 		}
 
 	}

@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 module cloud.google.com/go/cbt
 =======
 module cloud.google.com/cloud-bigtable-cbt-cli
@@ -7,6 +8,9 @@ module cloud.google.com/cloud-bigtable-cbt-cli
 =======
 module cloud.google.com/cbt
 >>>>>>> c7716be68 (chore: renamed cbt module (#13))
+=======
+module cloud.google.com/go/cbt
+>>>>>>> 22086a920 (chore: renamed module (#16))
 
 go 1.17
 

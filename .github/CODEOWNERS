@@ -1,5 +1,9 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 *		@googleapis/yoshi-go-admins @dmahugh @telpirion @enocom @tritone @garye @igorbernstein2
 =======
 *		@googleapis/yoshi-go-admins @dmahugh @telpirion @enocom @tritone
 >>>>>>> d904ac53c (chore: add CODEOWNERS file (#14))
+=======
+*		@googleapis/yoshi-go-admins @dmahugh @telpirion @enocom @tritone @garye @igorbernstein2
+>>>>>>> 22086a920 (chore: renamed module (#16))

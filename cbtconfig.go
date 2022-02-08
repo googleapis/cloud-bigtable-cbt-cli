@@ -29,10 +29,15 @@ import (
 	"bufio"
 	"bytes"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"crypto/tls"
 	"crypto/x509"
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+	"crypto/tls"
+	"crypto/x509"
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -50,20 +55,28 @@ import (
 
 	"golang.org/x/oauth2"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"golang.org/x/sys/execabs"
 	"google.golang.org/grpc/credentials"
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+	"google.golang.org/grpc/credentials"
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 )
 
 // Config represents a configuration.
 type Config struct {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 	Project, Instance string                           // required
 	Creds             string                           // optional
 	AdminEndpoint     string                           // optional
 	DataEndpoint      string                           // optional
 	CertFile          string                           // optional
+<<<<<<< HEAD
 	UserAgent         string                           // optional
 	AuthToken         string                           // optional
 	Timeout           time.Duration                    // optional
@@ -90,6 +103,10 @@ const (
 	AdminEndpoint     string             // optional
 	DataEndpoint      string             // optional
 	TokenSource       oauth2.TokenSource // derived
+=======
+	TokenSource       oauth2.TokenSource               // derived
+	TLSCreds          credentials.TransportCredentials // derived
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 }
 
 type RequiredFlags uint
@@ -122,28 +139,46 @@ func (c *Config) RegisterFlags() {
 	flag.StringVar(&c.Creds, "creds", c.Creds, "if set, use application credentials in this file")
 	flag.StringVar(&c.AdminEndpoint, "admin-endpoint", c.AdminEndpoint, "Override the admin api endpoint")
 	flag.StringVar(&c.DataEndpoint, "data-endpoint", c.DataEndpoint, "Override the data api endpoint")
+<<<<<<< HEAD
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+	flag.StringVar(&c.CertFile, "cert-file", c.CertFile, "Override the TLS certificates file")
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 }
 
 // CheckFlags checks that the required config values are set.
 func (c *Config) CheckFlags(required RequiredFlags) error {
 	var missing []string
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if c.CertFile != "" {
 		b, err := ioutil.ReadFile(c.CertFile)
 		if err != nil {
 			return fmt.Errorf("failed to load certificates from %s: %v", c.CertFile, err)
+=======
+	if c.CertFile != "" {
+		b, err := ioutil.ReadFile(c.CertFile)
+		if err != nil {
+			return fmt.Errorf("Failed to load certificates from %s: %v", c.CertFile, err)
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 		}
 
 		cp := x509.NewCertPool()
 		if !cp.AppendCertsFromPEM(b) {
+<<<<<<< HEAD
 			return fmt.Errorf("failed to append certificates from %s", c.CertFile)
+=======
+			return fmt.Errorf("Failed to append certificates from %s", c.CertFile)
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 		}
 
 		c.TLSCreds = credentials.NewTLS(&tls.Config{RootCAs: cp})
 	}
+<<<<<<< HEAD
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 	if required != NoneRequired {
 		c.SetFromGcloud()
 	}
@@ -323,9 +358,12 @@ func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, 
 		return nil, fmt.Errorf("Could not parse gcloud configuration")
 	}
 
+<<<<<<< HEAD
 	log.Printf("Retrieved gcloud configuration, active project is \"%s\"",
 		gcloudConfig.Configuration.Properties.Core.Project)
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 	return &gcloudConfig, nil
 }
 
@@ -364,12 +402,18 @@ func (c *Config) SetFromGcloud() error {
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if c.Project == "" && gcloudConfig.Configuration.Properties.Core.Project != "" {
 		log.Printf("gcloud active project is \"%s\"",
 			gcloudConfig.Configuration.Properties.Core.Project)
 =======
 	if c.Project == "" {
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+	if c.Project == "" && gcloudConfig.Configuration.Properties.Core.Project != "" {
+		log.Printf("gcloud active project is \"%s\"",
+			gcloudConfig.Configuration.Properties.Core.Project)
+>>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 		c.Project = gcloudConfig.Configuration.Properties.Core.Project
 	}
 

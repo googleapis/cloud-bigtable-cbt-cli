@@ -49,9 +49,12 @@ import (
 	"log"
 	"os"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	"os/exec"
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> d9821280b (fix(bigtable): replace unsafe exec in cbt (#3591))
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -60,6 +63,9 @@ import (
 	"golang.org/x/oauth2"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> d9821280b (fix(bigtable): replace unsafe exec in cbt (#3591))
 	"golang.org/x/sys/execabs"
 	"google.golang.org/grpc/credentials"
 =======
@@ -411,11 +417,15 @@ func (g *GcloudCmdTokenSource) Token() (*oauth2.Token, error) {
 // 'config-helper' command
 func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, error) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	out, err := execabs.Command(gcloudCmd, gcloudCmdArgs...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve gcloud configuration")
 =======
 	out, err := exec.Command(gcloudCmd, gcloudCmdArgs...).Output()
+=======
+	out, err := execabs.Command(gcloudCmd, gcloudCmdArgs...).Output()
+>>>>>>> d9821280b (fix(bigtable): replace unsafe exec in cbt (#3591))
 	if err != nil {
 		return nil, fmt.Errorf("Could not retrieve gcloud configuration")
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)

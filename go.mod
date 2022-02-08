@@ -36,7 +36,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
-	google.golang.org/api v0.65.0
+	google.golang.org/api v0.66.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 )
@@ -80,7 +80,11 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
+<<<<<<< HEAD
 	google.golang.org/genproto v0.0.0-20220111164026-67b88f271998 // indirect
 >>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
+=======
+	google.golang.org/genproto v0.0.0-20220114231437-d2e6a121cae0 // indirect
+>>>>>>> 128b7f962 (fix(deps): update module google.golang.org/api to v0.66.0 (#11))
 	rsc.io/binaryregexp v0.2.0 // indirect
 )

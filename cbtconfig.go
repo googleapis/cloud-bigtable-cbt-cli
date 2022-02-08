@@ -364,8 +364,12 @@ type GcloudConfig struct {
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 =======
 // GcloudCmdTokenSource holds the comamnd arguments. It is only intended to be set by the program.
+<<<<<<< HEAD
 // TODO(deklerk) Can this be unexported?
 >>>>>>> f48be9ffe (internal: adds lint checker to CI)
+=======
+// TODO(deklerk): Can this be unexported?
+>>>>>>> 0527a059a (all: standardize TODO)
 type GcloudCmdTokenSource struct {
 	Command string
 	Args    []string

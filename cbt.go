@@ -1089,10 +1089,14 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
 <<<<<<< HEAD
+<<<<<<< HEAD
 //go:generate go run cbt.go gcpolicy.go cbtconfig.go -o cbtdoc.go doc
 =======
 //go:generate go run cbt.go gcpolicy.go valueformatting.go -o cbtdoc.go doc
 >>>>>>> 86b2b5153 (feat(bigtable/cmd/cbt): Provide optional formatting of data values displayed with lookup and read (#4271))
+=======
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go -o cbtdoc.go doc
+>>>>>>> b6e68ed84 (fix: go generate now creates docs (#17))
 
 /*
 ` + docIntroTemplate + `

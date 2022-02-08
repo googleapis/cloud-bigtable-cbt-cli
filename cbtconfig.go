@@ -23,6 +23,9 @@ limitations under the License.
 */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b6e68ed84 (fix: go generate now creates docs (#17))
 package main
 =======
 // Package cbtconfig encapsulates common code for reading configuration from .cbtrc and gcloud.

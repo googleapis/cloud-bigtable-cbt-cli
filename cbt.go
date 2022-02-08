@@ -562,12 +562,17 @@ var commands = []struct {
 			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n\n" +
 			"  Examples:\n" +
 <<<<<<< HEAD
+<<<<<<< HEAD
 			"    cbt import csv-import-table data.csv\n" +
 			"    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
 =======
 			"    cbt import csv-import-table cbt-import-sample.csv\n" +
 			"    cbt import csv-import-table cbt-import-sample.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
 >>>>>>> 017c43be2 (chore: packaging tool up into module)
+=======
+			"    cbt import csv-import-table data.csv\n" +
+			"    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
+>>>>>>> 940807340 (fix(bigtable): Update cbt import instructions to include .csv format … (#10))
 		Required: ProjectAndInstanceRequired,
 	},
 	{

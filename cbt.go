@@ -418,12 +418,22 @@ var commands = []struct {
 			"  column-family=<family-name>           The column family label to use\n" +
 			"  batch-size=<500>                      The max number of rows per batch write request\n" +
 			"  workers=<1>                           The number of worker threads\n\n" +
-			"  Import data from a csv file into an existing cbt table that has the required column families.\n" +
-			"  See <example.csv.github.com/cbt-import-sample.csv> for a sample .csv file and formatting.\n" +
-			"  If no column family row is present, use the column-family flag to specify an existing family.\n\n" +
+			"  Import data from a CSV file into an existing Cloud Bigtable table that already has the column families your data requires.\n\n" +
+			"  The CSV file can support two rows of headers:\n" +
+			"      - (Optional) column families\n" +
+			"      - Column qualifiers\n" +
+			"  Because the first column is reserved for row keys, leave it empty in the header rows.\n" +
+			"  In the column family header, provide each column family once; it applies to the column it is in and every column to the right until another column family is found.\n" +
+			"  Each row after the header rows should contain a row key in the first column, followed by the data cells for the row.\n" +
+			"  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family. \n\n" +
+			"    ,column-family-1,,column-family-2,      // Optional column family row (1st cell empty)\n" +
+			"    ,column-1,column-2,column-3,column-4    // Column qualifiers row (1st cell empty)\n" +
+			"    a,TRUE,,,FALSE                          // Rowkey 'a' followed by data\n" +
+			"    b,,,TRUE,FALSE                          // Rowkey 'b' followed by data\n" +
+			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n\n" +
 			"  Examples:\n" +
-			"    cbt import csv-import-table cbt-import-sample.csv\n" +
-			"    cbt import csv-import-table cbt-import-sample.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
+			"    cbt import csv-import-table data.csv\n" +
+			"    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{

@@ -1,9 +1,13 @@
 /*
 <<<<<<< HEAD
+<<<<<<< HEAD
 Copyright 2015 Google LLC
 =======
 Copyright 2015 Google Inc. All Rights Reserved.
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+Copyright 2015 Google LLC
+>>>>>>> a4d942857 (all: modify copyright notice)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

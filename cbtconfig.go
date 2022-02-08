@@ -212,17 +212,25 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 	if c.CertFile != "" {
 		b, err := ioutil.ReadFile(c.CertFile)
 		if err != nil {
+<<<<<<< HEAD
 			return fmt.Errorf("Failed to load certificates from %s: %v", c.CertFile, err)
 >>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
+=======
+			return fmt.Errorf("failed to load certificates from %s: %v", c.CertFile, err)
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 		}
 
 		cp := x509.NewCertPool()
 		if !cp.AppendCertsFromPEM(b) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 			return fmt.Errorf("failed to append certificates from %s", c.CertFile)
 =======
 			return fmt.Errorf("Failed to append certificates from %s", c.CertFile)
 >>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
+=======
+			return fmt.Errorf("failed to append certificates from %s", c.CertFile)
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 		}
 
 		c.TLSCreds = credentials.NewTLS(&tls.Config{RootCAs: cp})
@@ -243,10 +251,14 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 	}
 	if len(missing) > 0 {
 <<<<<<< HEAD
+<<<<<<< HEAD
 		return fmt.Errorf("missing %s", strings.Join(missing, " and "))
 =======
 		return fmt.Errorf("Missing %s", strings.Join(missing, " and "))
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+		return fmt.Errorf("missing %s", strings.Join(missing, " and "))
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	}
 	return nil
 }
@@ -268,6 +280,7 @@ func Load() (*Config, error) {
 			return &Config{}, nil
 		}
 <<<<<<< HEAD
+<<<<<<< HEAD
 		return nil, fmt.Errorf("reading %s: %v", filename, err)
 	}
 	s := bufio.NewScanner(bytes.NewReader(data))
@@ -287,6 +300,9 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 			return nil, fmt.Errorf("bad line in %s: %q", filename, line)
 =======
 		return nil, fmt.Errorf("Reading %s: %v", filename, err)
+=======
+		return nil, fmt.Errorf("reading %s: %v", filename, err)
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	}
 	s := bufio.NewScanner(bytes.NewReader(data))
 	return readConfig(s, filename)
@@ -302,17 +318,25 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 		}
 		i := strings.Index(line, "=")
 		if i < 0 {
+<<<<<<< HEAD
 			return nil, fmt.Errorf("Bad line in %s: %q", filename, line)
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+			return nil, fmt.Errorf("bad line in %s: %q", filename, line)
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 		}
 		key, val := strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+1:])
 		switch key {
 		default:
 <<<<<<< HEAD
+<<<<<<< HEAD
 			return nil, fmt.Errorf("unknown key in %s: %q", filename, key)
 =======
 			return nil, fmt.Errorf("Unknown key in %s: %q", filename, key)
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+			return nil, fmt.Errorf("unknown key in %s: %q", filename, key)
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 		case "project":
 			c.Project = val
 		case "instance":
@@ -438,6 +462,7 @@ func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, 
 	out, err := execabs.Command(gcloudCmd, gcloudCmdArgs...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve gcloud configuration")
+<<<<<<< HEAD
 =======
 	out, err := exec.Command(gcloudCmd, gcloudCmdArgs...).Output()
 =======
@@ -446,16 +471,22 @@ func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, 
 	if err != nil {
 		return nil, fmt.Errorf("Could not retrieve gcloud configuration")
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	}
 
 	var gcloudConfig GcloudConfig
 	if err := json.Unmarshal(out, &gcloudConfig); err != nil {
+<<<<<<< HEAD
 <<<<<<< HEAD
 		return nil, fmt.Errorf("could not parse gcloud configuration")
 	}
 
 =======
 		return nil, fmt.Errorf("Could not parse gcloud configuration")
+=======
+		return nil, fmt.Errorf("could not parse gcloud configuration")
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	}
 
 <<<<<<< HEAD

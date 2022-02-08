@@ -16,6 +16,7 @@ go 1.17
 
 require (
 <<<<<<< HEAD
+<<<<<<< HEAD
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
@@ -29,16 +30,23 @@ require (
 	cloud.google.com/go v0.100.2 // indirect
 =======
 	cloud.google.com/go v0.100.2
+=======
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 	google.golang.org/api v0.65.0
 	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.27.1
 )
 
 require (
+<<<<<<< HEAD
 >>>>>>> 017c43be2 (chore: packaging tool up into module)
+=======
+	cloud.google.com/go v0.100.2 // indirect
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	cloud.google.com/go/compute v0.1.0 // indirect
 	cloud.google.com/go/iam v0.1.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.2.1 // indirect
@@ -53,6 +61,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
 <<<<<<< HEAD
+<<<<<<< HEAD
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -66,5 +75,12 @@ require (
 	google.golang.org/genproto v0.0.0-20220111164026-67b88f271998 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 >>>>>>> 017c43be2 (chore: packaging tool up into module)
+=======
+	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/genproto v0.0.0-20220111164026-67b88f271998 // indirect
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	rsc.io/binaryregexp v0.2.0 // indirect
 )

@@ -28,9 +28,12 @@ import (
 	"cloud.google.com/go/bigtable"
 	"cloud.google.com/go/bigtable/bttest"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	"github.com/golang/protobuf/proto"
 >>>>>>> 2f081a740 (chore: fixed tests)
+=======
+>>>>>>> 042db7b65 (chore: set scripts to be runnable (#21))
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"

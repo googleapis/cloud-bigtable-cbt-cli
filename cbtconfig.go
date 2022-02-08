@@ -93,6 +93,7 @@ type Config struct {
 }
 
 // RequiredFlags describes the flag requirements for a cbt command.
+<<<<<<< HEAD
 type RequiredFlags uint
 
 const (
@@ -117,15 +118,25 @@ const (
 >>>>>>> 94663da3a (bigtable/cmd/cbt: allow overriding TLS certificate chain)
 }
 
+=======
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 type RequiredFlags uint
 
-const NoneRequired RequiredFlags = 0
 const (
+	// NoneRequired specifies that not flags are required.
+	NoneRequired RequiredFlags = 0
+	// ProjectRequired specifies that the -project flag is required.
 	ProjectRequired RequiredFlags = 1 << iota
+	// InstanceRequired specifies that the -instance flag is required.
 	InstanceRequired
+	// ProjectAndInstanceRequired specifies that both -project and -instance is required.
+	ProjectAndInstanceRequired = ProjectRequired | InstanceRequired
 )
+<<<<<<< HEAD
 const ProjectAndInstanceRequired RequiredFlags = ProjectRequired | InstanceRequired
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 
 // RegisterFlags registers a set of standard flags for this config.
 // It should be called before flag.Parse.
@@ -302,26 +313,38 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // GcloudCredential holds gcloud credential information.
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+// GcloudCredential holds gcloud credential information.
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 type GcloudCredential struct {
 	AccessToken string    `json:"access_token"`
 	Expiry      time.Time `json:"token_expiry"`
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Token creates an oauth2 token using gcloud credentials.
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+// Token creates an oauth2 token using gcloud credentials.
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 func (cred *GcloudCredential) Token() *oauth2.Token {
 	return &oauth2.Token{AccessToken: cred.AccessToken, TokenType: "Bearer", Expiry: cred.Expiry}
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // GcloudConfig holds gcloud configuration values.
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+// GcloudConfig holds gcloud configuration values.
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 type GcloudConfig struct {
 	Configuration struct {
 		Properties struct {
@@ -334,10 +357,15 @@ type GcloudConfig struct {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // GcloudCmdTokenSource holds the comamnd arguments. It is only intended to be set by the program.
 // TODO(deklerk): Can this be unexported?
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+// GcloudCmdTokenSource holds the comamnd arguments. It is only intended to be set by the program.
+// TODO(deklerk) Can this be unexported?
+>>>>>>> f48be9ffe (internal: adds lint checker to CI)
 type GcloudCmdTokenSource struct {
 	Command string
 	Args    []string

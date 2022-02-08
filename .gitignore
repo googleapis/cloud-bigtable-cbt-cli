@@ -12,5 +12,9 @@ coverage.txt
 .DS_Store
 
 # Build artifacts
+<<<<<<< HEAD
 cloud-bigtable-cbt-cli
 cbt
+=======
+cloud-bigtable-cbt-cli
+>>>>>>> 017c43be2 (chore: packaging tool up into module)

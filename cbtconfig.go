@@ -26,8 +26,12 @@ limitations under the License.
 package main
 =======
 // Package cbtconfig encapsulates common code for reading configuration from .cbtrc and gcloud.
+<<<<<<< HEAD
 package cbtconfig
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
+=======
+package main
+>>>>>>> 017c43be2 (chore: packaging tool up into module)
 
 import (
 	"bufio"

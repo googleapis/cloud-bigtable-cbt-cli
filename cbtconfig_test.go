@@ -15,10 +15,14 @@ limitations under the License.
 */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 package main
 =======
 package cbtconfig
 >>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
+=======
+package main
+>>>>>>> 017c43be2 (chore: packaging tool up into module)
 
 import (
 	"bufio"

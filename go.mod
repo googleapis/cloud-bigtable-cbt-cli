@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a
+	golang.org/x/sys v0.0.0-20220207234003-57398862261d
 	google.golang.org/api v0.66.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1

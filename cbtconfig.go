@@ -145,6 +145,9 @@ const ProjectAndInstanceRequired RequiredFlags = ProjectRequired | InstanceRequi
 // It should be called before flag.Parse.
 func (c *Config) RegisterFlags() {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e7d5cb63e (bigtable: clean up documentation for cbt)
 	flag.StringVar(&c.Project, "project", c.Project, "project ID. If unset uses gcloud configured project")
 	flag.StringVar(&c.Instance, "instance", c.Instance, "Cloud Bigtable instance")
 	flag.StringVar(&c.Creds, "creds", c.Creds, "Path to the credentials file. If set, uses the application credentials in this file")

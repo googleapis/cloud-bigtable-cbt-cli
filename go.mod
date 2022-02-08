@@ -36,7 +36,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a
-	google.golang.org/api v0.66.0
+	google.golang.org/api v0.67.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 )
@@ -67,6 +67,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220126215142-9970aeb2e350 // indirect
+<<<<<<< HEAD
 =======
 	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420 // indirect
 	golang.org/x/text v0.3.6 // indirect
@@ -86,5 +87,7 @@ require (
 =======
 	google.golang.org/genproto v0.0.0-20220114231437-d2e6a121cae0 // indirect
 >>>>>>> 128b7f962 (fix(deps): update module google.golang.org/api to v0.66.0 (#11))
+=======
+>>>>>>> b45f46270 (fix(deps): update module google.golang.org/api to v0.67.0 (#23))
 	rsc.io/binaryregexp v0.2.0 // indirect
 )

@@ -27,6 +27,10 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"cloud.google.com/go/bigtable/bttest"
+<<<<<<< HEAD
+=======
+	"github.com/golang/protobuf/proto"
+>>>>>>> 2f081a740 (chore: fixed tests)
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"

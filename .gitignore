@@ -13,8 +13,13 @@ coverage.txt
 
 # Build artifacts
 <<<<<<< HEAD
+<<<<<<< HEAD
 cloud-bigtable-cbt-cli
 cbt
 =======
 cloud-bigtable-cbt-cli
 >>>>>>> 017c43be2 (chore: packaging tool up into module)
+=======
+cloud-bigtable-cbt-cli
+cbt
+>>>>>>> c7716be68 (chore: renamed cbt module (#13))

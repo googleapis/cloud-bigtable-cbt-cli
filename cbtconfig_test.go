@@ -14,14 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+<<<<<<< HEAD
 package main
+=======
+package cbtconfig
+>>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
 
 import (
 	"bufio"
 	"fmt"
 	"strings"
 	"testing"
+<<<<<<< HEAD
 	"time"
+=======
+>>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
 )
 
 func TestReadConfig(t *testing.T) {
@@ -33,13 +40,19 @@ func TestReadConfig(t *testing.T) {
 	certificateFile := "test-certificate-file"
 	userAgent := "test-user-agent"
 	authToken := "test-auth-token="
+<<<<<<< HEAD
 	timeout := time.Duration(42e9)
+=======
+>>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
 	// Read configuration from string containing spaces, tabs and empty lines.
 	validConfig := fmt.Sprintf(`
         project=%s
         instance=%s
         creds=%s
+<<<<<<< HEAD
         timeout=42s
+=======
+>>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
 
         admin-endpoint =%s
         data-endpoint= %s
@@ -75,9 +88,12 @@ func TestReadConfig(t *testing.T) {
 	if g, w := c.AuthToken, authToken; g != w {
 		t.Errorf("AuthToken mismatch\nGot: %s\nWant: %s", g, w)
 	}
+<<<<<<< HEAD
 	if g, w := c.Timeout, timeout; g != w {
 		t.Errorf("AuthToken mismatch\nGot: %s\nWant: %s", g, w)
 	}
+=======
+>>>>>>> 79a35db3a (bigtable: Ignore empty lines in cbtrc)
 
 	// Try to read an invalid config file and verify that it fails.
 	unknownKey := fmt.Sprintf("%s\nunknown-key=some-value", validConfig)

@@ -91,12 +91,16 @@ type Config struct {
 	UserAgent         string                           // optional
 	AuthToken         string                           // optional
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Timeout           time.Duration                    // optional
 =======
 	UserAgent         string                           // optional
 >>>>>>> d792c7b28 (bigtable/cmd/cbt: set distinct configurable user agent for CLI)
 =======
 >>>>>>> 4f0a6f3f9 (bigtable/cmd/cbt: Add support for -auth-token flag in CBT CLI)
+=======
+	Timeout           time.Duration                    // optional
+>>>>>>> 5da19e8ea (feat(bigtable/cmd/cbt): Add a timeout option (#4276))
 	TokenSource       oauth2.TokenSource               // derived
 	TLSCreds          credentials.TransportCredentials // derived
 }
@@ -164,6 +168,7 @@ func (c *Config) RegisterFlags() {
 	flag.StringVar(&c.AuthToken, "auth-token", c.AuthToken, "if set, use IAM Auth Token for requests")
 	flag.DurationVar(&c.Timeout, "timeout", c.Timeout,
 		"Timeout (e.g. 10s, 100ms, 5m )")
+<<<<<<< HEAD
 =======
 	flag.StringVar(&c.Project, "project", c.Project, "project ID, if unset uses gcloud configured project")
 	flag.StringVar(&c.Instance, "instance", c.Instance, "Cloud Bigtable instance")
@@ -183,6 +188,8 @@ func (c *Config) RegisterFlags() {
 =======
 	flag.StringVar(&c.AuthToken, "auth-token", c.AuthToken, "if set, use IAM Auth Token for requests")
 >>>>>>> 4f0a6f3f9 (bigtable/cmd/cbt: Add support for -auth-token flag in CBT CLI)
+=======
+>>>>>>> 5da19e8ea (feat(bigtable/cmd/cbt): Add a timeout option (#4276))
 }
 
 // CheckFlags checks that the required config values are set.
@@ -327,6 +334,7 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 				return nil, err
 			}
 			c.Timeout = timeout
+<<<<<<< HEAD
 =======
 >>>>>>> b3333af8e (bigtable: use gcloud config-helper for project and creds in cbt)
 =======
@@ -335,6 +343,8 @@ func readConfig(s *bufio.Scanner, filename string) (*Config, error) {
 		case "auth-token":
 			c.AuthToken = val
 >>>>>>> 4f0a6f3f9 (bigtable/cmd/cbt: Add support for -auth-token flag in CBT CLI)
+=======
+>>>>>>> 5da19e8ea (feat(bigtable/cmd/cbt): Add a timeout option (#4276))
 		}
 
 	}

@@ -198,7 +198,7 @@ var validValueFormattingEncodings = map[string]string{
 func (formatting *valueFormatting) validateEncoding(encoding string) (string, error) {
 	validEncoding, got := validValueFormattingEncodings[strings.ToLower(encoding)]
 	if !got {
-		return "", fmt.Errorf("Invalid encoding: %s", encoding)
+		return "", fmt.Errorf("invalid encoding: %s", encoding)
 	}
 	return validEncoding, nil
 }
@@ -211,12 +211,12 @@ func (formatting *valueFormatting) validateType(
 	case "LittleEndian", "BigEndian":
 		if ctype == "" {
 			return ctype, fmt.Errorf(
-				"No type specified for encoding: %s",
+				"no type specified for encoding: %s",
 				encoding)
 		}
 		_, got = binaryValueFormatters[strings.ToLower(ctype)]
 		if !got {
-			return ctype, fmt.Errorf("Invalid type: %s for encoding: %s",
+			return ctype, fmt.Errorf("invalid type: %s for encoding: %s",
 				ctype, encoding)
 		}
 		ctype = strings.ToLower(ctype)
@@ -226,7 +226,7 @@ func (formatting *valueFormatting) validateType(
 		}
 		_, got = formatting.pbMessageTypes[strings.ToLower(ctype)]
 		if !got {
-			return ctype, fmt.Errorf("Invalid type: %s for encoding: %s",
+			return ctype, fmt.Errorf("invalid type: %s for encoding: %s",
 				ctype, encoding)
 		}
 	}
@@ -282,7 +282,7 @@ func (formatting *valueFormatting) validateColumns() error {
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf(
-			"Bad encoding and types:\n%s",
+			"bad encoding and types:\n%s",
 			strings.Join(errs, "\n"))
 	}
 	return nil

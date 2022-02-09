@@ -229,7 +229,7 @@ func TestValueFormattingBinaryFormatter(t *testing.T) {
 	assertEqual(t, s, "[50462976 117835012 -1 -1660944385]")
 }
 
-func testValueFormattingPBFormatter(t *testing.T) {
+func TestValueFormattingPBFormatter(t *testing.T) {
 	formatting := newValueFormatting()
 	formatting.settings.ProtocolBufferDefinitions = append(
 		formatting.settings.ProtocolBufferDefinitions,
@@ -249,7 +249,7 @@ func testValueFormattingPBFormatter(t *testing.T) {
 			` phones:<number:"555-1212" type:HOME>`)
 
 	formatter = formatting.pbFormatter("not a thing")
-	text, err = formatter(in)
+	_, err = formatter(in)
 
 	assertEqual(t, fmt.Sprint(err),
 		"No Protocol-Buffer message time for: not a thing")
@@ -357,8 +357,14 @@ func TestValueFormattingFormat(t *testing.T) {
 		valueFormatColumn{Encoding: "p", Type: "tutorial.Person"}
 	formatting.settings.Columns["person"] = valueFormatColumn{Encoding: "p"}
 	err := formatting.setup(map[string]string{})
+	if err != nil {
+		t.Error("error setting up formattting")
+	}
 
 	s, err := formatting.format("", "f1", "f1:c1", []byte("Hello world!"))
+	if err != nil {
+		t.Error("formatting error")
+	}
 	assertEqual(t, s, "\"Hello world!\"\n")
 
 	s, err = formatting.format("  ", "f1", "f1:hexy", []byte("Hello world!"))

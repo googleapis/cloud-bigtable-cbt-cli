@@ -244,6 +244,10 @@ All values are optional and can be overridden at the command prompt.
 
 const docIntroTemplate = `The ` + "`cbt`" + ` tool is a command-line tool that allows you to interact with Cloud Bigtable.
 See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` tool.
+Before you use the ` + "`cbt`" + ` tool, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
+
+The examples on this page use [sample data](https://cloud.google.com/bigtable/docs/using-filters#data) similar to data
+that you might store in Bigtable.
 
 Usage:
 
@@ -469,7 +473,7 @@ var commands = []struct {
 		Desc: "List tables and column families",
 		do:   doLS,
 		Usage: "cbt ls                List tables\n" +
-			"cbt ls <table-id>     List column families in a table\n\n" +
+			"cbt ls <table-id>     List a table's column families and garbage collection policies\n\n" +
 			"    Example: cbt ls mobile-time-series",
 		Required: ProjectAndInstanceRequired,
 	},
@@ -488,7 +492,7 @@ var commands = []struct {
 			" [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>]" +
 			" [app-profile=<app-profile-id>]\n" +
 			"  start=<row-key>                     Start reading at this row\n" +
-			"  end=<row-row>                       Stop reading before this row\n" +
+			"  end=<row-key>                       Stop reading before this row\n" +
 			"  prefix=<row-key-prefix>             Read rows with this prefix\n" +
 			"  regex=<regex>                       Read rows with keys matching this regex\n" +
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +

@@ -45,7 +45,6 @@ func TestTimeout(t *testing.T) {
 
 	config := Config{Creds: "c", Project: "p", Instance: "i"}
 
-	// Fix this
 	func() { doMain(&config, []string{"count", "mytable"}) }()
 
 	_, deadlineSet := ctxt.ctx.Deadline()
@@ -56,7 +55,6 @@ func TestTimeout(t *testing.T) {
 	config.Timeout = time.Duration(42e9)
 	now := time.Now()
 
-	// Fix this
 	func() { doMain(&config, []string{"count", "mytable"}) }()
 
 	deadline, deadlineSet := ctxt.ctx.Deadline()

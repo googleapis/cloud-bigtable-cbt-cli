@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Google LLC
+Copyright 2022 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
@@ -25,6 +26,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
@@ -92,7 +94,10 @@ func TestParseValueFormatSettings(t *testing.T) {
 		t.Errorf("Parse error: %s", err)
 	}
 
-	assertEqual(t, formatting.settings, want)
+	//assertEqual(t, formatting.settings, want)
+	if !cmp.Equal(formatting.settings, want) {
+		t.Error("Formatting error: formatting settings don't match return value")
+	}
 }
 
 func TestSetupPBMessages(t *testing.T) {
@@ -122,98 +127,116 @@ func TestSetupPBMessages(t *testing.T) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	assertEqual(
-		t,
-		keys,
-		[]string{
-			"addressbook",
-			"equipment",
-			"person",
-			"tutorial.addressbook",
-			"tutorial.person",
-		},
-	)
+
+	want := []string{
+		"addressbook",
+		"equipment",
+		"person",
+		"tutorial.addressbook",
+		"tutorial.person",
+	}
+
+	if !cmp.Equal(keys, want) {
+		t.Errorf("Protobuf keys not set correctly: wanted: %s; got %s",
+			want, keys)
+	}
 
 	// Make sure the message descriptors are usable.
 	message := dynamic.NewMessage(formatting.pbMessageTypes["tutorial.person"])
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
-	assertNoError(t, err)
+	if err != nil {
+		t.Error("Not able to open testdata (person.bin)")
+	}
+
 	err = message.Unmarshal(in)
-	assertNoError(t, err)
-	assertEqual(
-		t,
-		fmt.Sprint(message),
-		`name:"Jim" id:42 email:"jim@example.com"`+
-			` phones:<number:"555-1212" type:HOME>`)
+	if err != nil {
+		t.Error("Protobuf message not correctly deserialized")
+	}
+
+	wantFormatted := string(`name:"Jim" id:42 email:"jim@example.com"` +
+		` phones:<number:"555-1212" type:HOME>`)
+	gotFormatted := fmt.Sprint(message)
+
+	if gotFormatted != wantFormatted {
+		t.Errorf("Format error: wanted %s; got %s", wantFormatted,
+			gotFormatted)
+	}
 }
 
 var TestBinaryFormaterTestData = []byte{
 	0, 1, 2, 3, 4, 5, 6, 7, 255, 255, 255, 255, 255, 255, 255, 156}
 
-func checkBinaryValueFormater(
+func checkBinaryValueFormatter(
 	t *testing.T, ctype string, nbytes int, expect string, order binary.ByteOrder,
 ) {
 	s, err :=
 		binaryValueFormatters[ctype](TestBinaryFormaterTestData[:nbytes], order)
-	assertNoError(t, err)
-	assertEqual(t, s, expect)
+
+	if err != nil {
+		t.Errorf("Error formatting binary value: %v", err)
+	}
+
+	if s != expect {
+		t.Errorf("Binary value formatted incorrectly: wanted %s; got %s",
+			expect, s)
+	}
 }
 
 func TestBinaryValueFormaterINT8(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "int8", 16, "[0 1 2 3 4 5 6 7 -1 -1 -1 -1 -1 -1 -1 -100]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterINT16(t *testing.T) {
 	// Main test that tests special handling of arrays vs scalers, etc.
 
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "int16", 16, "[1 515 1029 1543 -1 -1 -1 -100]", binary.BigEndian)
-	checkBinaryValueFormater(t, "int16", 0, "[]", binary.BigEndian)
-	checkBinaryValueFormater(t, "int16", 2, "1", binary.BigEndian)
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(t, "int16", 0, "[]", binary.BigEndian)
+	checkBinaryValueFormatter(t, "int16", 2, "1", binary.BigEndian)
+	checkBinaryValueFormatter(
 		t, "int16", 16, "[256 770 1284 1798 -1 -1 -1 -25345]", binary.LittleEndian)
 }
 
 func TestBinaryValueFormaterINT32(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "int32", 16, "[66051 67438087 -1 -100]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterINT64(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "int64", 16, "[283686952306183 -100]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterUINT8(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "uint8", 16, "[0 1 2 3 4 5 6 7 255 255 255 255 255 255 255 156]",
 		binary.BigEndian)
 }
 
 func TestBinaryValueFormaterUINT16(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "uint16", 16, "[1 515 1029 1543 65535 65535 65535 65436]",
 		binary.BigEndian)
 }
 
 func TestBinaryValueFormaterUINT32(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "uint32", 16, "[66051 67438087 4294967295 4294967196]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterUINT64(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "uint64", 16, "[283686952306183 18446744073709551516]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterFLOAT32(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "float32", 16, "[9.2557e-41 1.5636842e-36 NaN NaN]", binary.BigEndian)
 }
 
 func TestBinaryValueFormaterFLOAT64(t *testing.T) {
-	checkBinaryValueFormater(
+	checkBinaryValueFormatter(
 		t, "float64", 16, "[1.40159977307889e-309 NaN]", binary.BigEndian)
 }
 
@@ -221,12 +244,28 @@ func TestValueFormattingBinaryFormatter(t *testing.T) {
 	formatting := newValueFormatting()
 	var formatter = formatting.binaryFormatter("BigEndian", "int32")
 	s, err := formatter(TestBinaryFormaterTestData)
-	assertNoError(t, err)
-	assertEqual(t, s, "[66051 67438087 -1 -100]")
+	want := "[66051 67438087 -1 -100]"
+
+	if err != nil {
+		t.Errorf("Error when creating formatter: %v", err)
+	}
+	if s != want {
+		t.Errorf("Binary value formatted incorrectly: wanted %s, got %s",
+			want, s)
+	}
+
 	formatter = formatting.binaryFormatter("LittleEndian", "int32")
 	s, err = formatter(TestBinaryFormaterTestData)
-	assertNoError(t, err)
-	assertEqual(t, s, "[50462976 117835012 -1 -1660944385]")
+	want = "[50462976 117835012 -1 -1660944385]"
+
+	if err != nil {
+		t.Errorf("Error when creating formatter: %v", err)
+	}
+
+	if s != want {
+		t.Errorf("Binary value formatted incorrectly: wanted %s, got %s",
+			want, s)
+	}
 }
 
 func TestValueFormattingPBFormatter(t *testing.T) {
@@ -235,24 +274,46 @@ func TestValueFormattingPBFormatter(t *testing.T) {
 		formatting.settings.ProtocolBufferDefinitions,
 		filepath.Join("testdata", "addressbook.proto"))
 	err := formatting.setupPBMessages()
-	assertNoError(t, err)
+	if err != nil {
+		t.Errorf("Error creating protobuf formatter: %v", err)
+	}
 
 	formatter := formatting.pbFormatter("person")
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
-	assertNoError(t, err)
+	if err != nil {
+		t.Errorf("Error reading testdata: %v", err)
+	}
 
-	text, err := formatter(in)
-	assertNoError(t, err)
+	got, err := formatter(in)
+	want := `name: "Jim"
+id: 42
+email: "jim@example.com"
+phones: <
+  number: "555-1212"
+  type: HOME
+>`
 
-	assertEqual(t, text,
-		`name:"Jim" id:42 email:"jim@example.com"`+
-			` phones:<number:"555-1212" type:HOME>`)
+	if err != nil {
+		t.Errorf("Error creating protobuf formatter: %v", err)
+	}
 
-	formatter = formatting.pbFormatter("not a thing")
-	_, err = formatter(in)
+	if got != want {
+		t.Errorf("Protobuf not formatted correctly: wanted %s; got %s",
+			want, got)
+	}
 
-	assertEqual(t, fmt.Sprint(err),
-		"No Protocol-Buffer message time for: not a thing")
+	/*
+		formatter = formatting.pbFormatter("not a thing")
+		_, err = formatter(in)
+
+		got = fmt.Sprint(err)
+		want = "No Protocol-Buffer message time for: not a thing"
+
+		if got != want {
+			t.Errorf("Incorrect response to bad input: wanted %s, got %s",
+				want, got)
+		}
+	*/
 }
 
 func TestValueFormattingValidateColumns(t *testing.T) {
@@ -261,49 +322,77 @@ func TestValueFormattingValidateColumns(t *testing.T) {
 	// Typeless encoding:
 	formatting.settings.Columns["c1"] = valueFormatColumn{Encoding: "HEX"}
 	err := formatting.validateColumns()
-	assertEqual(t, err, nil)
+	if err != nil {
+		t.Errorf("Error validating columns: %v", err)
+	}
 
 	// Inherit encoding:
 	formatting.settings.Columns["c1"] = valueFormatColumn{}
 	formatting.settings.DefaultEncoding = "H"
 	err = formatting.validateColumns()
-	assertEqual(t, err, nil)
+	if err != nil {
+		t.Errorf("Error validating columns: %v", err)
+	}
 
 	// Inherited encoding wants a type:
 	formatting.settings.DefaultEncoding = "B"
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\nc1: No type specified for encoding: B")
+	got := fmt.Sprint(err)
+	want := "bad encoding and types:\nc1: no type specified for encoding: B"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	// provide a type:
 	formatting.settings.Columns["c1"] = valueFormatColumn{Type: "INT"}
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\nc1: Invalid type: INT for encoding: B")
+	got = fmt.Sprint(err)
+	want = "bad encoding and types:\nc1: invalid type: INT for encoding: B"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	// Fix the type:
 	formatting.settings.Columns["c1"] = valueFormatColumn{Type: "INT64"}
 	err = formatting.validateColumns()
-	assertEqual(t, err, nil)
+	if err != nil {
+		t.Errorf("Error validating columns: %v", err)
+	}
 
 	// Now, do a bunch of this again in a family
 	family := newValueFormatFamily()
 	formatting.settings.Families["f"] = family
 	formatting.settings.Families["f"].Columns["c2"] = valueFormatColumn{}
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\nf:c2: No type specified for encoding: B")
+	got = fmt.Sprint(err)
+	want = "bad encoding and types:\nf:c2: no type specified for encoding: B"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 	formatting.settings.Families["f"].Columns["c2"] =
 		valueFormatColumn{Type: "int64"}
 	err = formatting.validateColumns()
-	assertEqual(t, err, nil)
+	if err != nil {
+		t.Errorf("Error validating columns: %v", err)
+	}
 
 	// Change the family encoding.  The type won't work anymore.
 	family.DefaultEncoding = "p"
 	formatting.settings.Families["f"] = family
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\nf:c2: Invalid type: int64 for encoding: p")
+	got = fmt.Sprint(err)
+	want = "bad encoding and types:\nf:c2: invalid type: int64 for encoding: p"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	// clear the type_ to make sure we get that message:
 	formatting.settings.Families["f"].Columns["c2"] = valueFormatColumn{}
@@ -311,33 +400,51 @@ func TestValueFormattingValidateColumns(t *testing.T) {
 	// we're bad here because no type was specified, so we fall
 	// back to the column name, which doesn't have a
 	// protocol-buffer message type.
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\nf:c2: Invalid type: c2 for encoding: p")
+	want = fmt.Sprint(err)
+	got = "bad encoding and types:\nf:c2: invalid type: c2 for encoding: p"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	// Look! Multiple errors!
 	formatting.settings.Columns["c1"] = valueFormatColumn{}
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\n"+
-			"c1: No type specified for encoding: B\n"+
-			"f:c2: Invalid type: c2 for encoding: p")
+	got = fmt.Sprint(err)
+	want = "bad encoding and types:\n" +
+		"c1: no type specified for encoding: B\n" +
+		"f:c2: invalid type: c2 for encoding: p"
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	// Fix the protocol-buffer problem:
 	formatting.pbMessageTypes["address"] = &desc.MessageDescriptor{}
 	formatting.settings.Families["f"].Columns["c2"] =
 		valueFormatColumn{Type: "address"}
 	err = formatting.validateColumns()
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\n"+
-			"c1: No type specified for encoding: B")
+	got = fmt.Sprint(err)
+	want = "bad encoding and types:\n" +
+		"c1: no type specified for encoding: B"
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 }
 
 func TestValueFormattingSetup(t *testing.T) {
 	formatting := newValueFormatting()
 	err := formatting.setup(map[string]string{
 		"format-file": filepath.Join("testdata", t.Name()+".yml")})
-	assertEqual(t, fmt.Sprint(err),
-		"Bad encoding and types:\ncol1: No type specified for encoding: B")
+	got := fmt.Sprint(err)
+	want := "bad encoding and types:\ncol1: no type specified for encoding: B"
+
+	if got != want {
+		t.Errorf("Responded incorrectly to bad input:\nwanted %s,\ngot %s",
+			want, got)
+	}
 }
 
 func TestValueFormattingFormat(t *testing.T) {
@@ -358,27 +465,43 @@ func TestValueFormattingFormat(t *testing.T) {
 	formatting.settings.Columns["person"] = valueFormatColumn{Encoding: "p"}
 	err := formatting.setup(map[string]string{})
 	if err != nil {
-		t.Error("error setting up formattting")
+		t.Errorf("Error setting up formattting: %v", err)
 	}
 
-	s, err := formatting.format("", "f1", "f1:c1", []byte("Hello world!"))
+	got, err := formatting.format("", "f1", "f1:c1", []byte("Hello world!"))
+	want := "\"Hello world!\"\n"
+
 	if err != nil {
-		t.Error("formatting error")
+		t.Errorf("Error during formatting: %v", err)
 	}
-	assertEqual(t, s, "\"Hello world!\"\n")
 
-	s, err = formatting.format("  ", "f1", "f1:hexy", []byte("Hello world!"))
-	assertNoError(t, err)
-	assertEqual(t, s, "  48 65 6c 6c 6f 20 77 6f 72 6c 64 21\n")
+	if got != want {
+		t.Errorf("Values formatted incorrectly: wanted %s, got %s", want, got)
+	}
 
-	s, err = formatting.format(
+	got, err = formatting.format("  ", "f1", "f1:hexy", []byte("Hello world!"))
+	want = "  48 65 6c 6c 6f 20 77 6f 72 6c 64 21\n"
+	if err != nil {
+		t.Errorf("Error when formatting: %v", err)
+	}
+
+	if got != want {
+		t.Errorf("Values formatted incorrectly: wanted %s, got %s", want, got)
+	}
+
+	got, err = formatting.format(
 		"    ", "binaries", "binaries:cb", []byte("Hello world!"))
-	assertNoError(t, err)
-	assertEqual(t, s, "    [18533 27756 28448 30575 29292 25633]\n")
+	want = "    [18533 27756 28448 30575 29292 25633]\n"
+
+	if err != nil {
+		t.Errorf("Error formatting binary value: %v", err)
+	}
+	if got != want {
+		t.Errorf("Values formatted incorrectly: wanted %s, got %s", want, got)
+	}
 
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
-	assertNoError(t, err)
-	pbExpect :=
+	want =
 		"      name: \"Jim\"\n" +
 			"      id: 42\n" +
 			"      email: \"jim@example.com\"\n" +
@@ -387,10 +510,19 @@ func TestValueFormattingFormat(t *testing.T) {
 			"        type: HOME\n" +
 			"      >\n"
 
+	if err != nil {
+		t.Errorf("Error when reading testdata: %v", err)
+	}
+
 	for _, col := range []string{"address", "person"} {
-		s, err = formatting.format("      ", "f1", "f1:"+col, in)
-		assertNoError(t, err)
-		assertEqual(t, s, pbExpect)
+		got, err = formatting.format("      ", "f1", "f1:"+col, in)
+		if err != nil {
+			t.Errorf("Error formatting data: %v", err)
+		}
+		if got != want {
+			t.Errorf("Values formatted incorrectly: wanted %s, got %s", want,
+				got)
+		}
 	}
 }
 
@@ -417,15 +549,19 @@ func TestPrintRow(t *testing.T) {
 			},
 		},
 	}
-	out := captureStdout(func() { printRow(row) })
-	expect :=
+
+	var out bytes.Buffer
+
+	printRow(row, &out)
+	got := out.String()
+	want :=
 		"----------------------------------------\n" +
 			"r1\n" +
-			"  f1:c1\n" +
+			"  f1:c1                                    @ 1969/12/31-16:00:00.000000\n" +
 			"    \"Hello!\"\n" +
-			"  f1:c2\n" +
+			"  f1:c2                                    @ 1969/12/31-16:00:00.000000\n" +
 			"    \"\\x01\\x02\"\n" +
-			"  f2:person\n" +
+			"  f2:person                                @ 1969/12/31-16:00:00.000000\n" +
 			"    \"\\n\\x03Jim\\x10*\\x1a\\x0fjim@example.com\\\"\\f\\n\\b555-1212\\x10\\x01\"\n" +
 			""
 
@@ -435,7 +571,10 @@ func TestPrintRow(t *testing.T) {
 		return string(timestampsRE.ReplaceAll([]byte(s), []byte("")))
 	}
 
-	assertEqual(t, stripTimestamps(out), expect)
+	if got != want {
+		t.Errorf("Formatting printed incorrectly:\nwanted\n%s,\ngot\n%s",
+			want, got)
+	}
 
 	oldValueFormatting := globalValueFormatting
 	defer func() { globalValueFormatting = oldValueFormatting }()
@@ -449,7 +588,7 @@ func TestPrintRow(t *testing.T) {
 		valueFormatColumn{Encoding: "ProtocolBuffer"}
 	globalValueFormatting.setup(map[string]string{})
 
-	expectf := ("----------------------------------------\n" +
+	want = ("----------------------------------------\n" +
 		"r1\n" +
 		"  f1:c1\n" +
 		"    \"Hello!\"\n" +
@@ -465,6 +604,10 @@ func TestPrintRow(t *testing.T) {
 		"    >\n" +
 		"")
 
-	out = captureStdout(func() { printRow(row) })
-	assertEqual(t, stripTimestamps(out), expectf)
+	var out2 bytes.Buffer
+	printRow(row, &out2)
+	got = stripTimestamps(out2.String())
+	if got != want {
+		t.Errorf("Formatting printed incorrectly: wanted %s, got %s", want, got)
+	}
 }

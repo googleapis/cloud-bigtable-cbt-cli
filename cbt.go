@@ -1193,12 +1193,14 @@ func doLookup(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("Reading row: %v", err)
 	}
-	printRow(r)
+
+	var buf bytes.Buffer
+	printRow(r, &buf)
 }
 
-func printRow(r bigtable.Row) {
-	fmt.Println(strings.Repeat("-", 40))
-	fmt.Println(r.Key())
+func printRow(r bigtable.Row, w io.Writer) {
+	fmt.Fprintln(w, strings.Repeat("-", 40))
+	fmt.Fprintln(w, r.Key())
 
 	var fams []string
 	for fam := range r {
@@ -1210,7 +1212,7 @@ func printRow(r bigtable.Row) {
 		sort.Sort(byColumn(ris))
 		for _, ri := range ris {
 			ts := time.Unix(0, int64(ri.Timestamp)*1e3)
-			fmt.Printf("  %-40s @ %s\n",
+			fmt.Fprintf(w, "  %-40s @ %s\n",
 				ri.Column,
 				ts.Format("2006/01/02-15:04:05.000000"))
 			formatted, err :=
@@ -1219,7 +1221,7 @@ func printRow(r bigtable.Row) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			fmt.Print(formatted)
+			fmt.Fprint(w, formatted)
 		}
 	}
 }
@@ -1369,7 +1371,8 @@ func doRead(ctx context.Context, args ...string) {
 	// TODO(dsymonds): Support filters.
 	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(args[0])
 	err = tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
-		printRow(r)
+		var buf bytes.Buffer
+		printRow(r, &buf)
 		return true
 	}, opts...)
 	if err != nil {

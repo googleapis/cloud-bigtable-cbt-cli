@@ -93,8 +93,6 @@ func TestParseValueFormatSettings(t *testing.T) {
 	if err != nil {
 		t.Errorf("Parse error: %s", err)
 	}
-
-	//assertEqual(t, formatting.settings, want)
 	if !cmp.Equal(formatting.settings, want) {
 		t.Error("Formatting error: formatting settings don't match return value")
 	}
@@ -302,18 +300,20 @@ phones: <
 			want, got)
 	}
 
-	/*
-		formatter = formatting.pbFormatter("not a thing")
-		_, err = formatter(in)
+	formatter = formatting.pbFormatter("not a thing")
+	nextIn, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
+	if err != nil {
+		t.Errorf("Error reading testdata: %v", err)
+	}
+	_, err = formatter(nextIn)
 
-		got = fmt.Sprint(err)
-		want = "No Protocol-Buffer message time for: not a thing"
+	got = fmt.Sprint(err)
+	want = "No Protocol-Buffer message time for: not a thing"
 
-		if got != want {
-			t.Errorf("Incorrect response to bad input: wanted %s, got %s",
-				want, got)
-		}
-	*/
+	if got != want {
+		t.Errorf("Incorrect response to bad input: wanted %s, got %s",
+			want, got)
+	}
 }
 
 func TestValueFormattingValidateColumns(t *testing.T) {

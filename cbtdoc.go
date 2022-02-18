@@ -150,7 +150,7 @@ defaults or need to specify different formats for columns of the same
 name in different families.
 
 Protocol-buffer definition files may be given, as well as directories
-used to search for definition files and and files imported by them. If
+used to search for definition files and files imported by them. If
 no paths are specified, then the current working directory is used.
 Locations of standard protocol buffer imports (`google/protobuf/*`) need not be specified.
 
@@ -209,7 +209,7 @@ Family objects have properties:
 Here's an example of a format file:
 ```
 
-  default_encoding: P
+  default_encoding: ProtocolBuffer
 
   protocol_buffer_definitions:
     - MyProto.proto
@@ -218,7 +218,7 @@ Here's an example of a format file:
     contact:
       type: person
     size:
-      encoding: B
+      encoding: BigEndian
       type: uint32
 
 ```

@@ -1196,6 +1196,7 @@ func doLookup(ctx context.Context, args ...string) {
 
 	var buf bytes.Buffer
 	printRow(r, &buf)
+	fmt.Println(buf.String())
 }
 
 func printRow(r bigtable.Row, w io.Writer) {
@@ -1373,6 +1374,7 @@ func doRead(ctx context.Context, args ...string) {
 	err = tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
 		var buf bytes.Buffer
 		printRow(r, &buf)
+		fmt.Println(buf.String())
 		return true
 	}, opts...)
 	if err != nil {

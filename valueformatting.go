@@ -144,7 +144,7 @@ var binaryValueFormatters = map[string]binaryValueFormatter{
 }
 
 func (formatting *valueFormatting) binaryFormatter(
-	encoding ValidEncodings, ctype string,
+	encoding validEncodings, ctype string,
 ) valueFormatter {
 	var byteOrder binary.ByteOrder
 	// We don't check the get below because it's checked in
@@ -179,17 +179,17 @@ func (formatting *valueFormatting) pbFormatter(ctype string) valueFormatter {
 	}
 }
 
-type ValidEncodings string
+type validEncodings string
 
 const (
-	None           ValidEncodings = ""
-	BigEndian      ValidEncodings = "BigEndian"      // is a list of all the
-	LittleEndian   ValidEncodings = "LittleEndian"   // encodings supported
-	ProtocolBuffer ValidEncodings = "ProtocolBuffer" // for pretty-print
-	Hex            ValidEncodings = "Hex"            // formatting
+	None           validEncodings = ""               // INTERNAL.
+	BigEndian      validEncodings = "BigEndian"      // is a list of all the
+	LittleEndian   validEncodings = "LittleEndian"   // encodings supported
+	ProtocolBuffer validEncodings = "ProtocolBuffer" // for pretty-print
+	Hex            validEncodings = "Hex"            // formatting
 )
 
-var validValueFormattingEncodings = map[string]ValidEncodings{
+var validValueFormattingEncodings = map[string]validEncodings{
 	"bigendian":       BigEndian,
 	"b":               BigEndian,
 	"binary":          BigEndian,
@@ -205,7 +205,7 @@ var validValueFormattingEncodings = map[string]ValidEncodings{
 	"":                None,
 }
 
-func (formatting *valueFormatting) validateEncoding(encoding string) (ValidEncodings, error) {
+func (formatting *valueFormatting) validateEncoding(encoding string) (validEncodings, error) {
 	validEncoding, got := validValueFormattingEncodings[strings.ToLower(encoding)]
 	if !got {
 		return "", fmt.Errorf("invalid encoding: %s", encoding)
@@ -214,7 +214,7 @@ func (formatting *valueFormatting) validateEncoding(encoding string) (ValidEncod
 }
 
 func (formatting *valueFormatting) validateType(
-	cname string, validEncoding ValidEncodings, encoding, ctype string,
+	cname string, validEncoding validEncodings, encoding, ctype string,
 ) (string, error) {
 	var got bool
 	switch validEncoding {
@@ -245,7 +245,7 @@ func (formatting *valueFormatting) validateType(
 
 func (formatting *valueFormatting) validateFormat(
 	cname, encoding, ctype string,
-) (ValidEncodings, string, error) {
+) (validEncodings, string, error) {
 	validEncoding, err := formatting.validateEncoding(encoding)
 	if err == nil {
 		ctype, err =

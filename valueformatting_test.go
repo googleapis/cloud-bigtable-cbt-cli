@@ -276,7 +276,7 @@ func TestValueFormattingPBFormatter(t *testing.T) {
 		t.Errorf("Error creating protobuf formatter: %v", err)
 	}
 
-	formatter := formatting.pbFormatter("person")
+	formatter, err := formatting.pbFormatter("person")
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
 	if err != nil {
 		t.Errorf("Error reading testdata: %v", err)
@@ -300,22 +300,9 @@ phones: <
 			want, got)
 	}
 
-	// TODO(telpirion): Isolate and mitigate underlying bug.
-	t.Skip()
-
-	formatter = formatting.pbFormatter("not a thing")
-	nextIn, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
-	if err != nil {
-		t.Errorf("Error reading testdata: %v", err)
-	}
-	_, err = formatter(nextIn)
-
-	got = fmt.Sprint(err)
-	want = "No Protocol-Buffer message time for: not a thing"
-
-	if got != want {
-		t.Errorf("Incorrect response to bad input: wanted %s, got %s",
-			want, got)
+	_, err = formatting.pbFormatter("not a thing")
+	if err == nil {
+		t.Error("Protobuf formatter created with bad input")
 	}
 }
 

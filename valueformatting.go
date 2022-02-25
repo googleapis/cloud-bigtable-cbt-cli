@@ -161,11 +161,12 @@ func (formatting *valueFormatting) binaryFormatter(
 	}
 }
 
-func (formatting *valueFormatting) pbFormatter(ctype string) valueFormatter {
-	// We don't check the get below because it's checked in
-	// validateType, which is called by validateFormat, which is
-	// called by format before calling this. :)
+func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	md := formatting.pbMessageTypes[strings.ToLower(ctype)]
+	if md == nil {
+		return nil, fmt.Errorf("no Protocol-Buffer message time for: %v", ctype)
+	}
+
 	return func(in []byte) (string, error) {
 		message := dynamic.NewMessage(md)
 		err := message.Unmarshal(in)
@@ -175,8 +176,9 @@ func (formatting *valueFormatting) pbFormatter(ctype string) valueFormatter {
 				return string(data), nil
 			}
 		}
+
 		return "", err
-	}
+	}, nil
 }
 
 type validEncodings string
@@ -408,7 +410,12 @@ func (formatting *valueFormatting) format(
 			case hex:
 				formatter = formatting.hexFormatter
 			case protocolBuffer:
-				formatter = formatting.pbFormatter(ctype)
+				formatter, err = formatting.pbFormatter(ctype)
+				// pbFormatter can return an error if underlying input PB is
+				// bad
+				if err != nil {
+					return "", err
+				}
 			case none:
 				formatter = formatting.defaultFormatter
 			}

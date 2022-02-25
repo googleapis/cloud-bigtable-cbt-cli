@@ -277,6 +277,10 @@ func TestValueFormattingPBFormatter(t *testing.T) {
 	}
 
 	formatter, err := formatting.pbFormatter("person")
+	if err != nil {
+		t.Error("Could not create protobuf formatter")
+	}
+
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
 	if err != nil {
 		t.Errorf("Error reading testdata: %v", err)

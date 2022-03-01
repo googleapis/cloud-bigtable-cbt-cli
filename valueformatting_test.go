@@ -240,7 +240,7 @@ func TestBinaryValueFormaterFLOAT64(t *testing.T) {
 
 func TestValueFormattingBinaryFormatter(t *testing.T) {
 	formatting := newValueFormatting()
-	var formatter = formatting.binaryFormatter("BigEndian", "int32")
+	var formatter = formatting.binaryFormatter(BigEndian, "int32")
 	s, err := formatter(TestBinaryFormaterTestData)
 	want := "[66051 67438087 -1 -100]"
 
@@ -252,7 +252,7 @@ func TestValueFormattingBinaryFormatter(t *testing.T) {
 			want, s)
 	}
 
-	formatter = formatting.binaryFormatter("LittleEndian", "int32")
+	formatter = formatting.binaryFormatter(LittleEndian, "int32")
 	s, err = formatter(TestBinaryFormaterTestData)
 	want = "[50462976 117835012 -1 -1660944385]"
 

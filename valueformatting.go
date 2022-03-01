@@ -144,14 +144,14 @@ var binaryValueFormatters = map[string]binaryValueFormatter{
 }
 
 func (formatting *valueFormatting) binaryFormatter(
-	encoding validEncodings, ctype string,
+	encoding ValidEncodings, ctype string,
 ) valueFormatter {
 	var byteOrder binary.ByteOrder
 	// We don't check the get below because it's checked in
 	// validateType, which is called by validateFormat, which is
 	// called by format before calling this. :)
 	typeFormatter := binaryValueFormatters[ctype]
-	if encoding == bigEndian {
+	if encoding == BigEndian {
 		byteOrder = binary.BigEndian
 	} else {
 		byteOrder = binary.LittleEndian
@@ -181,46 +181,46 @@ func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, er
 	}, nil
 }
 
-type validEncodings string
+type ValidEncodings int
 
 const (
-	none           validEncodings = ""               // INTERNAL.
-	bigEndian      validEncodings = "BigEndian"      // is a list of all the
-	littleEndian   validEncodings = "LittleEndian"   // encodings supported
-	protocolBuffer validEncodings = "ProtocolBuffer" // for pretty-print
-	hex            validEncodings = "Hex"            // formatting
+	None           ValidEncodings = 1 << iota // INTERNAL.
+	BigEndian                                 // is a list of all the
+	LittleEndian                              // encodings supported
+	ProtocolBuffer                            // for pretty-print
+	Hex                                       // formatting
 )
 
-var validValueFormattingEncodings = map[string]validEncodings{
-	"bigendian":       bigEndian,
-	"b":               bigEndian,
-	"binary":          bigEndian,
-	"littleendian":    littleEndian,
-	"L":               littleEndian,
-	"hex":             hex,
-	"h":               hex,
-	"protocolbuffer":  protocolBuffer,
-	"protocol-buffer": protocolBuffer,
-	"protocol_buffer": protocolBuffer,
-	"proto":           protocolBuffer,
-	"p":               protocolBuffer,
-	"":                none,
+var validValueFormattingEncodings = map[string]ValidEncodings{
+	"bigendian":       BigEndian,
+	"b":               BigEndian,
+	"binary":          BigEndian,
+	"littleendian":    LittleEndian,
+	"L":               LittleEndian,
+	"hex":             Hex,
+	"h":               Hex,
+	"protocolbuffer":  ProtocolBuffer,
+	"protocol-buffer": ProtocolBuffer,
+	"protocol_buffer": ProtocolBuffer,
+	"proto":           ProtocolBuffer,
+	"p":               ProtocolBuffer,
+	"":                None,
 }
 
-func (formatting *valueFormatting) validateEncoding(encoding string) (validEncodings, error) {
+func (formatting *valueFormatting) validateEncoding(encoding string) (ValidEncodings, error) {
 	validEncoding, got := validValueFormattingEncodings[strings.ToLower(encoding)]
 	if !got {
-		return "", fmt.Errorf("invalid encoding: %s", encoding)
+		return 0, fmt.Errorf("invalid encoding: %s", encoding)
 	}
 	return validEncoding, nil
 }
 
 func (formatting *valueFormatting) validateType(
-	cname string, validEncoding validEncodings, encoding, ctype string,
+	cname string, validEncoding ValidEncodings, encoding, ctype string,
 ) (string, error) {
 	var got bool
 	switch validEncoding {
-	case littleEndian, bigEndian:
+	case LittleEndian, BigEndian:
 		if ctype == "" {
 			return ctype, fmt.Errorf(
 				"no type specified for encoding: %s",
@@ -232,7 +232,7 @@ func (formatting *valueFormatting) validateType(
 				ctype, encoding)
 		}
 		ctype = strings.ToLower(ctype)
-	case protocolBuffer:
+	case ProtocolBuffer:
 		if ctype == "" {
 			ctype = cname
 		}
@@ -247,7 +247,7 @@ func (formatting *valueFormatting) validateType(
 
 func (formatting *valueFormatting) validateFormat(
 	cname, encoding, ctype string,
-) (validEncodings, string, error) {
+) (ValidEncodings, string, error) {
 	validEncoding, err := formatting.validateEncoding(encoding)
 	if err == nil {
 		ctype, err =
@@ -405,18 +405,18 @@ func (formatting *valueFormatting) format(
 			formatter = formatting.badFormatter(err)
 		} else {
 			switch validEncoding {
-			case bigEndian, littleEndian:
+			case BigEndian, LittleEndian:
 				formatter = formatting.binaryFormatter(validEncoding, ctype)
-			case hex:
+			case Hex:
 				formatter = formatting.hexFormatter
-			case protocolBuffer:
+			case ProtocolBuffer:
 				formatter, err = formatting.pbFormatter(ctype)
 				// pbFormatter can return an error if underlying input PB is
 				// bad
 				if err != nil {
 					return "", err
 				}
-			case none:
+			case None:
 				formatter = formatting.defaultFormatter
 			}
 		}

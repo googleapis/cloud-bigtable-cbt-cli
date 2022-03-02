@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.7
 	github.com/jhump/protoreflect v1.11.0 // Third-party dependency; proceed with caution
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
 	google.golang.org/api v0.67.0
 	google.golang.org/grpc v1.44.0
@@ -29,7 +29,7 @@ require (
 	github.com/google/btree v1.0.1 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

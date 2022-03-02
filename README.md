@@ -56,3 +56,8 @@ it once you are happy with the output.
 
 The configuration for the options (`-project`, `-instance`, and `-creds`) is in [cbtconfig.go](../../internal/cbtconfig/cbtconfig.go).
 So change that file if you need to modify those.
+
+## Third-party dependencies
+
+This tool uses a couple of third-party dependencies, external from the Go
+standard libraries.

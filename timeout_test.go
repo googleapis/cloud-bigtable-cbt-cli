@@ -44,7 +44,8 @@ func TestTimeout(t *testing.T) {
 	defer func() { table = nil }()
 
 	config := Config{Creds: "c", Project: "p", Instance: "i"}
-	captureStdout(func() { doMain(&config, []string{"count", "mytable"}) })
+
+	func() { doMain(&config, []string{"count", "mytable"}) }()
 
 	_, deadlineSet := ctxt.ctx.Deadline()
 	if deadlineSet {
@@ -53,7 +54,8 @@ func TestTimeout(t *testing.T) {
 
 	config.Timeout = time.Duration(42e9)
 	now := time.Now()
-	captureStdout(func() { doMain(&config, []string{"count", "mytable"}) })
+
+	func() { doMain(&config, []string{"count", "mytable"}) }()
 
 	deadline, deadlineSet := ctxt.ctx.Deadline()
 	if !deadlineSet {

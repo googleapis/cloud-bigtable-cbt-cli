@@ -551,11 +551,11 @@ func TestPrintRow(t *testing.T) {
 	want :=
 		"----------------------------------------\n" +
 			"r1\n" +
-			"  f1:c1                                    @ 1969/12/31-16:00:00.000000\n" +
+			"  f1:c1\n" +
 			"    \"Hello!\"\n" +
-			"  f1:c2                                    @ 1969/12/31-16:00:00.000000\n" +
+			"  f1:c2\n" +
 			"    \"\\x01\\x02\"\n" +
-			"  f2:person                                @ 1969/12/31-16:00:00.000000\n" +
+			"  f2:person\n" +
 			"    \"\\n\\x03Jim\\x10*\\x1a\\x0fjim@example.com\\\"\\f\\n\\b555-1212\\x10\\x01\"\n" +
 			""
 
@@ -564,6 +564,7 @@ func TestPrintRow(t *testing.T) {
 	stripTimestamps := func(s string) string {
 		return string(timestampsRE.ReplaceAll([]byte(s), []byte("")))
 	}
+	got = stripTimestamps(got)
 
 	if got != want {
 		t.Errorf("Formatting printed incorrectly:\nwanted\n%s,\ngot\n%s",

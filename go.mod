@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/jhump/protoreflect v1.11.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 	google.golang.org/api v0.67.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1

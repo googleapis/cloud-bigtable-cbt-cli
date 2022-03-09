@@ -1193,7 +1193,9 @@ func doLookup(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("Reading row: %v", err)
 	}
-	err = globalValueFormatting.setup(parsed)
+
+	formatFilePath := parsed["format-file"]
+	err = globalValueFormatting.setup(formatFilePath)
 	if err != nil {
 		log.Fatalf("Reading row: %v", err)
 	}
@@ -1368,7 +1370,8 @@ func doRead(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.RowFilter(filters[0]))
 	}
 
-	err = globalValueFormatting.setup(parsed)
+	formatFilePath := parsed["format-file"]
+	err = globalValueFormatting.setup(formatFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}

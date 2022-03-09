@@ -335,18 +335,29 @@ func (formatting *valueFormatting) setupPBMessages() error {
 	return nil
 }
 
-func (formatting *valueFormatting) setup(options map[string]string) error {
+func (formatting *valueFormatting) setup(formatFilePath string) error {
 	var err error = nil
-	if options["format-file"] != "" {
-		err = formatting.parse(options["format-file"])
+
+	if formatFilePath != "" {
+		err = formatting.parse(formatFilePath)
 	}
-	if err == nil {
-		err = formatting.setupPBMessages()
+
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		err = formatting.validateColumns()
+
+	// call setupPBMessages() and validateColumns() even if format-file is
+	// not specified
+	err = formatting.setupPBMessages()
+	if err != nil {
+		return err
 	}
-	return err
+
+	err = formatting.validateColumns()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (formatting *valueFormatting) colEncodingType(

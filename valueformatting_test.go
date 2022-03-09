@@ -431,8 +431,7 @@ func TestValueFormattingValidateColumns(t *testing.T) {
 
 func TestValueFormattingSetup(t *testing.T) {
 	formatting := newValueFormatting()
-	err := formatting.setup(map[string]string{
-		"format-file": filepath.Join("testdata", t.Name()+".yml")})
+	err := formatting.setup(filepath.Join("testdata", t.Name()+".yml"))
 	got := fmt.Sprint(err)
 	want := "bad encoding and types:\ncol1: no type specified for encoding: B"
 
@@ -458,7 +457,7 @@ func TestValueFormattingFormat(t *testing.T) {
 	formatting.settings.Columns["address"] =
 		valueFormatColumn{Encoding: "p", Type: "tutorial.Person"}
 	formatting.settings.Columns["person"] = valueFormatColumn{Encoding: "p"}
-	err := formatting.setup(map[string]string{})
+	err := formatting.setup("")
 	if err != nil {
 		t.Errorf("Error setting up formattting: %v", err)
 	}
@@ -528,7 +527,7 @@ func TestProtobuffer(t *testing.T) {
 		[]string{filepath.Join("testdata", "cat.proto")}
 	globalValueFormatting.settings.Columns["cat"] =
 		valueFormatColumn{Encoding: "ProtocolBuffer"}
-	globalValueFormatting.setup(map[string]string{})
+	globalValueFormatting.setup("")
 
 	row := bigtable.Row{
 		"f1": {
@@ -622,7 +621,7 @@ func TestPrintRow(t *testing.T) {
 		valueFormatColumn{Encoding: "Binary", Type: "int16"}
 	globalValueFormatting.settings.Columns["person"] =
 		valueFormatColumn{Encoding: "ProtocolBuffer"}
-	globalValueFormatting.setup(map[string]string{})
+	globalValueFormatting.setup("")
 
 	want = ("----------------------------------------\n" +
 		"r1\n" +

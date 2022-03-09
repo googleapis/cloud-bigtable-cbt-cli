@@ -1,0 +1,9 @@
+syntax = "proto3";
+package cats;
+
+option go_package = "github.com/protocolbuffers/protobuf/examples/go/tutorialpb";
+
+message Cat {
+  string name = 1;
+  int32 age = 2;
+}

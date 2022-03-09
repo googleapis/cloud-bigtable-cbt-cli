@@ -170,14 +170,16 @@ func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, er
 	return func(in []byte) (string, error) {
 		message := dynamic.NewMessage(md)
 		err := message.Unmarshal(in)
-		if err == nil {
-			data, err := message.MarshalTextIndent()
-			if err == nil {
-				return string(data), nil
-			}
+		if err != nil {
+			return "", fmt.Errorf("couldn't deserialize bytes to protobuffer message: %v", err)
 		}
 
-		return "", err
+		data, err := message.MarshalTextIndent()
+		if err != nil {
+			return "", fmt.Errorf("couldn't serialize message to bytes: %v", err)
+		}
+
+		return string(data), nil
 	}, nil
 }
 

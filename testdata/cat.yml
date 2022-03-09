@@ -1,0 +1,15 @@
+
+#
+# Example format file
+#
+
+protocol_buffer_definitions:
+  - cat.proto
+protocol_buffer_paths:
+  - testdata/
+
+
+columns:
+  c2:
+    encoding: ProtocolBuffer
+    type: cats.Cat

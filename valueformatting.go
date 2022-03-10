@@ -346,8 +346,8 @@ func (formatting *valueFormatting) setup(formatFilePath string) error {
 		return err
 	}
 
-	// call setupPBMessages() and validateColumns() even if format-file is
-	// not specified
+	// call setupPBMessages() and validateColumns() even if
+	// format-file is not specified
 	err = formatting.setupPBMessages()
 	if err != nil {
 		return err

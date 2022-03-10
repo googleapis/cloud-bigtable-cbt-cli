@@ -520,14 +520,10 @@ func TestValueFormattingFormat(t *testing.T) {
 	}
 }
 
-func TestProtobuffer(t *testing.T) {
+func TestProtobufferAndYAML(t *testing.T) {
 
 	globalValueFormatting = newValueFormatting()
-	globalValueFormatting.settings.ProtocolBufferDefinitions =
-		[]string{filepath.Join("testdata", "cat.proto")}
-	globalValueFormatting.settings.Columns["cat"] =
-		valueFormatColumn{Encoding: "ProtocolBuffer"}
-	globalValueFormatting.setup("")
+	globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
 
 	row := bigtable.Row{
 		"f1": {

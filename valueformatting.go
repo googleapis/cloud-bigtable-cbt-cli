@@ -162,15 +162,41 @@ func (formatting *valueFormatting) binaryFormatter(
 	}
 }
 
-func (formatting *valueFormatting) jsonFormatter(indent string) (valueFormatter, error) {
+// Returns a valueFormatter function that pretty-prints JSON values.
+func (formatting *valueFormatting) jsonFormatter() (valueFormatter, error) {
 	return func(in []byte) (string, error) {
-		var formattedJSONBuffer bytes.Buffer
-		err := json.Indent(&formattedJSONBuffer, in, "", indent)
+
+		var outputJSONInterface interface{}
+		err := json.Unmarshal(in, &outputJSONInterface)
 		if err != nil {
 			return "", err
 		}
 
-		return string(formattedJSONBuffer.String()), nil
+		// Recursive inner function that returns strings from
+		// JSON values and nested JSON data structures
+		var formatJSON func(value interface{}) string
+		formatJSON = func(value interface{}) string {
+			switch v := value.(type) {
+			case string:
+				return fmt.Sprintf("%6s", fmt.Sprintf("\"%s\"", v))
+			case int:
+				return fmt.Sprintf("%6d", v)
+			case float64:
+				return fmt.Sprintf("%6.2f", v)
+			case map[string]interface{}:
+				s := ""
+				for k, v := range v {
+					formattedValue := formatJSON(v)
+					s += fmt.Sprintf("  %-3s: %v\n", k, formattedValue)
+				}
+				return s
+			}
+			return fmt.Sprintf("%v", value)
+		}
+
+		outputString := formatJSON(outputJSONInterface)
+
+		return outputString, nil
 	}, nil
 }
 
@@ -183,14 +209,16 @@ func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, er
 	return func(in []byte) (string, error) {
 		message := dynamic.NewMessage(md)
 		err := message.Unmarshal(in)
-		if err == nil {
-			data, err := message.MarshalTextIndent()
-			if err == nil {
-				return string(data), nil
-			}
+		if err != nil {
+			return "", fmt.Errorf("couldn't deserialize bytes to protobuffer message: %v", err)
 		}
 
-		return "", err
+		data, err := message.MarshalTextIndent()
+		if err != nil {
+			return "", fmt.Errorf("couldn't serialize message to bytes: %v", err)
+		}
+
+		return string(data), nil
 	}, nil
 }
 
@@ -349,18 +377,29 @@ func (formatting *valueFormatting) setupPBMessages() error {
 	return nil
 }
 
-func (formatting *valueFormatting) setup(options map[string]string) error {
+func (formatting *valueFormatting) setup(formatFilePath string) error {
 	var err error = nil
-	if options["format-file"] != "" {
-		err = formatting.parse(options["format-file"])
+
+	if formatFilePath != "" {
+		err = formatting.parse(formatFilePath)
 	}
-	if err == nil {
-		err = formatting.setupPBMessages()
+
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		err = formatting.validateColumns()
+
+	// call setupPBMessages() and validateColumns() even if
+	// format-file is not specified
+	err = formatting.setupPBMessages()
+	if err != nil {
+		return err
 	}
-	return err
+
+	err = formatting.validateColumns()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (formatting *valueFormatting) colEncodingType(
@@ -427,8 +466,12 @@ func (formatting *valueFormatting) format(
 				formatter = formatting.hexFormatter
 			case protocolBuffer:
 				formatter, err = formatting.pbFormatter(ctype)
-				// pbFormatter can return an error if underlying input PB is
-				// bad
+				// pbFormatter returns an error if underlying input PB is bad
+				if err != nil {
+					return "", err
+				}
+			case JSON:
+				formatter, err = formatting.jsonFormatter()
 				if err != nil {
 					return "", err
 				}

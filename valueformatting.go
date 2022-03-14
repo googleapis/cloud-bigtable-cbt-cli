@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -161,6 +162,18 @@ func (formatting *valueFormatting) binaryFormatter(
 	}
 }
 
+func (formatting *valueFormatting) jsonFormatter(indent string) (valueFormatter, error) {
+	return func(in []byte) (string, error) {
+		var formattedJSONBuffer bytes.Buffer
+		err := json.Indent(&formattedJSONBuffer, in, "", indent)
+		if err != nil {
+			return "", err
+		}
+
+		return string(formattedJSONBuffer.String()), nil
+	}, nil
+}
+
 func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	md := formatting.pbMessageTypes[strings.ToLower(ctype)]
 	if md == nil {
@@ -189,16 +202,19 @@ const (
 	littleEndian                              // encodings supported
 	protocolBuffer                            // for pretty-print
 	hex                                       // formatting
+	JSON
 )
 
 var validValueFormattingEncodings = map[string]validEncodings{
 	"bigendian":       bigEndian,
 	"b":               bigEndian,
 	"binary":          bigEndian,
-	"littleendian":    littleEndian,
-	"L":               littleEndian,
 	"hex":             hex,
 	"h":               hex,
+	"j":               JSON,
+	"json":            JSON,
+	"littleendian":    littleEndian,
+	"L":               littleEndian,
 	"protocolbuffer":  protocolBuffer,
 	"protocol-buffer": protocolBuffer,
 	"protocol_buffer": protocolBuffer,

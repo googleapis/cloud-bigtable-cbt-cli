@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -263,6 +264,32 @@ func TestValueFormattingBinaryFormatter(t *testing.T) {
 	if s != want {
 		t.Errorf("Binary value formatted incorrectly: wanted %s, got %s",
 			want, s)
+	}
+}
+
+func TestValueFormattingJSONFormatter(t *testing.T) {
+	formatting := newValueFormatting()
+	formatter, err := formatting.jsonFormatter("  ")
+
+	if err != nil {
+		t.Errorf("Error creating formatter: %v", err)
+	}
+
+	input := []byte("{\"name\": \"Brave\", \"age\": 2}")
+
+	want := `{
+  "name": "Brave",
+  "age": 2
+}`
+
+	got, err := formatter(input)
+	if err != nil {
+		t.Errorf("Error formatting JSON string: %v", err)
+	}
+
+	if !strings.Contains(got, want) {
+		t.Errorf("JSON not formatted correctly: wanted\n%s\n; got\n%s\n",
+			want, got)
 	}
 }
 

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
@@ -182,12 +183,23 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 			case int:
 				return fmt.Sprintf("%6d", t)
 			case float64:
+				// TODO: Decide whether floating-point value precision should
+				// be configurable
 				return fmt.Sprintf("%6.2f", t)
 			case map[string]interface{}:
 				s := ""
-				for k, v := range t {
+
+				// Sort the keys first for alphabetical field print order
+				keys := make([]string, 0, len(t))
+				for k := range t {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+
+				for _, k := range keys {
+					v := t[k]
 					fv := fmat(v)
-					s += fmt.Sprintf("%-3s: %v\n", k, fv)
+					s += fmt.Sprintf("%s: %v\n", k, fv)
 				}
 				return s
 			}

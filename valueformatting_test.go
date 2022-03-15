@@ -277,8 +277,8 @@ func TestValueFormattingJSONFormatter(t *testing.T) {
 
 	input := []byte("{\"name\": \"Brave\", \"age\": 2}")
 
-	want := `name:     Brave
-age:      2.00`
+	want := `name: "Brave"
+age:   2.00`
 
 	got, err := formatter(input)
 	if err != nil {
@@ -564,8 +564,8 @@ func TestJSONAndYAML(t *testing.T) {
 	want := ("----------------------------------------\n" +
 		"r1\n" +
 		"  f1:json\n" +
-		"      name: \"Brave\"\n" +
-		"      age:   2.00")
+		"    name: \"Brave\"\n" +
+		"    age:   2.00")
 
 	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
 

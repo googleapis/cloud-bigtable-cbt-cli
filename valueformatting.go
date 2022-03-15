@@ -163,7 +163,7 @@ func (f *valueFormatting) binaryFormatter(
 }
 
 // Returns a valueFormatter function that pretty-prints JSON values.
-func (formatting *valueFormatting) jsonFormatter() (valueFormatter, error) {
+func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 	return func(in []byte) (string, error) {
 
 		var outputJSONInterface interface{}
@@ -174,29 +174,27 @@ func (formatting *valueFormatting) jsonFormatter() (valueFormatter, error) {
 
 		// Recursive inner function that returns strings from
 		// JSON values and nested JSON data structures
-		var formatJSON func(value interface{}) string
-		formatJSON = func(value interface{}) string {
-			switch v := value.(type) {
+		var fmat func(v interface{}) string
+		fmat = func(v interface{}) string {
+			switch t := v.(type) {
 			case string:
-				return fmt.Sprintf("%6s", fmt.Sprintf("\"%s\"", v))
+				return fmt.Sprintf("%6s", fmt.Sprintf("\"%s\"", t))
 			case int:
-				return fmt.Sprintf("%6d", v)
+				return fmt.Sprintf("%6d", t)
 			case float64:
-				return fmt.Sprintf("%6.2f", v)
+				return fmt.Sprintf("%6.2f", t)
 			case map[string]interface{}:
 				s := ""
-				for k, v := range v {
-					formattedValue := formatJSON(v)
-					s += fmt.Sprintf("  %-3s: %v\n", k, formattedValue)
+				for k, v := range t {
+					fv := fmat(v)
+					s += fmt.Sprintf("%-3s: %v\n", k, fv)
 				}
 				return s
 			}
-			return fmt.Sprintf("%v", value)
+			return fmt.Sprintf("%v", v)
 		}
 
-		outputString := formatJSON(outputJSONInterface)
-
-		return outputString, nil
+		return fmat(outputJSONInterface), nil
 	}, nil
 }
 
@@ -231,7 +229,7 @@ const (
 	littleEndian                              // encodings supported
 	protocolBuffer                            // for pretty-print
 	hex                                       // formatting
-	JSON
+	jsonEncoded
 )
 
 var validValueFormattingEncodings = map[string]validEncodings{
@@ -240,8 +238,8 @@ var validValueFormattingEncodings = map[string]validEncodings{
 	"binary":          bigEndian,
 	"hex":             hex,
 	"h":               hex,
-	"j":               JSON,
-	"json":            JSON,
+	"j":               jsonEncoded,
+	"json":            jsonEncoded,
 	"littleendian":    littleEndian,
 	"L":               littleEndian,
 	"protocolbuffer":  protocolBuffer,
@@ -472,7 +470,7 @@ func (f *valueFormatting) format(
 				if err != nil {
 					return "", err
 				}
-			case JSON:
+			case jsonEncoded:
 				formatter, err = f.jsonFormatter()
 				if err != nil {
 					return "", err

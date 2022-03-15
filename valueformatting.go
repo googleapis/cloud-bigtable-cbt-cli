@@ -143,7 +143,7 @@ var binaryValueFormatters = map[string]binaryValueFormatter{
 	},
 }
 
-func (formatting *valueFormatting) binaryFormatter(
+func (f *valueFormatting) binaryFormatter(
 	encoding validEncodings, ctype string,
 ) valueFormatter {
 	var byteOrder binary.ByteOrder
@@ -161,8 +161,8 @@ func (formatting *valueFormatting) binaryFormatter(
 	}
 }
 
-func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
-	md := formatting.pbMessageTypes[strings.ToLower(ctype)]
+func (f *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
+	md := f.pbMessageTypes[strings.ToLower(ctype)]
 	if md == nil {
 		return nil, fmt.Errorf("no Protocol-Buffer message time for: %v", ctype)
 	}
@@ -170,14 +170,16 @@ func (formatting *valueFormatting) pbFormatter(ctype string) (valueFormatter, er
 	return func(in []byte) (string, error) {
 		message := dynamic.NewMessage(md)
 		err := message.Unmarshal(in)
-		if err == nil {
-			data, err := message.MarshalTextIndent()
-			if err == nil {
-				return string(data), nil
-			}
+		if err != nil {
+			return "", fmt.Errorf("couldn't deserialize bytes to protobuffer message: %v", err)
 		}
 
-		return "", err
+		data, err := message.MarshalTextIndent()
+		if err != nil {
+			return "", fmt.Errorf("couldn't serialize message to bytes: %v", err)
+		}
+
+		return string(data), nil
 	}, nil
 }
 
@@ -207,7 +209,7 @@ var validValueFormattingEncodings = map[string]validEncodings{
 	"":                none,
 }
 
-func (formatting *valueFormatting) validateEncoding(encoding string) (validEncodings, error) {
+func (f *valueFormatting) validateEncoding(encoding string) (validEncodings, error) {
 	validEncoding, got := validValueFormattingEncodings[strings.ToLower(encoding)]
 	if !got {
 		return 0, fmt.Errorf("invalid encoding: %s", encoding)
@@ -215,7 +217,7 @@ func (formatting *valueFormatting) validateEncoding(encoding string) (validEncod
 	return validEncoding, nil
 }
 
-func (formatting *valueFormatting) validateType(
+func (f *valueFormatting) validateType(
 	cname string, validEncoding validEncodings, encoding, ctype string,
 ) (string, error) {
 	var got bool
@@ -236,7 +238,7 @@ func (formatting *valueFormatting) validateType(
 		if ctype == "" {
 			ctype = cname
 		}
-		_, got = formatting.pbMessageTypes[strings.ToLower(ctype)]
+		_, got = f.pbMessageTypes[strings.ToLower(ctype)]
 		if !got {
 			return ctype, fmt.Errorf("invalid type: %s for encoding: %s",
 				ctype, encoding)
@@ -245,47 +247,47 @@ func (formatting *valueFormatting) validateType(
 	return ctype, nil
 }
 
-func (formatting *valueFormatting) validateFormat(
+func (f *valueFormatting) validateFormat(
 	cname, encoding, ctype string,
 ) (validEncodings, string, error) {
-	validEncoding, err := formatting.validateEncoding(encoding)
+	validEncoding, err := f.validateEncoding(encoding)
 	if err == nil {
 		ctype, err =
-			formatting.validateType(cname, validEncoding, encoding, ctype)
+			f.validateType(cname, validEncoding, encoding, ctype)
 	}
 	return validEncoding, ctype, err
 }
 
-func (formatting *valueFormatting) override(old, new string) string {
+func (f *valueFormatting) override(old, new string) string {
 	if new != "" {
 		return new
 	}
 	return old
 }
 
-func (formatting *valueFormatting) validateColumns() error {
-	defaultEncoding := formatting.settings.DefaultEncoding
-	defaultType := formatting.settings.DefaultType
+func (f *valueFormatting) validateColumns() error {
+	defaultEncoding := f.settings.DefaultEncoding
+	defaultType := f.settings.DefaultType
 
 	var errs []string
-	for cname, col := range formatting.settings.Columns {
-		_, _, err := formatting.validateFormat(
+	for cname, col := range f.settings.Columns {
+		_, _, err := f.validateFormat(
 			cname,
-			formatting.override(defaultEncoding, col.Encoding),
-			formatting.override(defaultType, col.Type))
+			f.override(defaultEncoding, col.Encoding),
+			f.override(defaultType, col.Type))
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %s", cname, err))
 		}
 	}
-	for fname, fam := range formatting.settings.Families {
+	for fname, fam := range f.settings.Families {
 		familyEncoding :=
-			formatting.override(defaultEncoding, fam.DefaultEncoding)
-		familyType := formatting.override(defaultType, fam.DefaultType)
+			f.override(defaultEncoding, fam.DefaultEncoding)
+		familyType := f.override(defaultType, fam.DefaultType)
 		for cname, col := range fam.Columns {
-			_, _, err := formatting.validateFormat(
+			_, _, err := f.validateFormat(
 				cname,
-				formatting.override(familyEncoding, col.Encoding),
-				formatting.override(familyType, col.Type))
+				f.override(familyEncoding, col.Encoding),
+				f.override(familyType, col.Type))
 			if err != nil {
 				errs = append(errs, fmt.Sprintf(
 					"%s:%s: %s", fname, cname, err))
@@ -300,21 +302,21 @@ func (formatting *valueFormatting) validateColumns() error {
 	return nil
 }
 
-func (formatting *valueFormatting) parse(path string) error {
+func (f *valueFormatting) parse(path string) error {
 	data, err := ioutil.ReadFile(path)
 	if err == nil {
-		err = yaml.UnmarshalStrict([]byte(data), &formatting.settings)
+		err = yaml.UnmarshalStrict([]byte(data), &f.settings)
 	}
 	return err
 }
 
-func (formatting *valueFormatting) setupPBMessages() error {
-	if len(formatting.settings.ProtocolBufferDefinitions) > 0 {
+func (f *valueFormatting) setupPBMessages() error {
+	if len(f.settings.ProtocolBufferDefinitions) > 0 {
 		parser := protoparse.Parser{
-			ImportPaths: formatting.settings.ProtocolBufferPaths,
+			ImportPaths: f.settings.ProtocolBufferPaths,
 		}
 		fds, err := parser.ParseFiles(
-			formatting.settings.ProtocolBufferDefinitions...)
+			f.settings.ProtocolBufferDefinitions...)
 		if err != nil {
 			return err
 		}
@@ -322,10 +324,10 @@ func (formatting *valueFormatting) setupPBMessages() error {
 			prefix := fd.GetPackage()
 			for _, md := range fd.GetMessageTypes() {
 				key := md.GetName()
-				formatting.pbMessageTypes[strings.ToLower(key)] = md
+				f.pbMessageTypes[strings.ToLower(key)] = md
 				if prefix != "" {
 					key = prefix + "." + key
-					formatting.pbMessageTypes[strings.ToLower(key)] = md
+					f.pbMessageTypes[strings.ToLower(key)] = md
 				}
 			}
 		}
@@ -333,61 +335,72 @@ func (formatting *valueFormatting) setupPBMessages() error {
 	return nil
 }
 
-func (formatting *valueFormatting) setup(options map[string]string) error {
+func (f *valueFormatting) setup(formatFilePath string) error {
 	var err error = nil
-	if options["format-file"] != "" {
-		err = formatting.parse(options["format-file"])
+
+	if formatFilePath != "" {
+		err = f.parse(formatFilePath)
 	}
-	if err == nil {
-		err = formatting.setupPBMessages()
+
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		err = formatting.validateColumns()
+
+	// call setupPBMessages() and validateColumns() even if
+	// format-file is not specified
+	err = f.setupPBMessages()
+	if err != nil {
+		return err
 	}
-	return err
+
+	err = f.validateColumns()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (formatting *valueFormatting) colEncodingType(
+func (f *valueFormatting) colEncodingType(
 	family, column string,
 ) (string, string) {
-	defaultEncoding := formatting.settings.DefaultEncoding
-	defaultType := formatting.settings.DefaultType
+	defaultEncoding := f.settings.DefaultEncoding
+	defaultType := f.settings.DefaultType
 
-	fam, got := formatting.settings.Families[family]
+	fam, got := f.settings.Families[family]
 	if got {
 		familyEncoding :=
-			formatting.override(defaultEncoding, fam.DefaultEncoding)
-		familyType := formatting.override(defaultType, fam.DefaultType)
+			f.override(defaultEncoding, fam.DefaultEncoding)
+		familyType := f.override(defaultType, fam.DefaultType)
 		col, got := fam.Columns[column]
 		if got {
-			return formatting.override(familyEncoding, col.Encoding),
-				formatting.override(familyType, col.Type)
+			return f.override(familyEncoding, col.Encoding),
+				f.override(familyType, col.Type)
 		}
 		return familyEncoding, familyType
 	}
-	col, got := formatting.settings.Columns[column]
+	col, got := f.settings.Columns[column]
 	if got {
-		return formatting.override(defaultEncoding, col.Encoding),
-			formatting.override(defaultType, col.Type)
+		return f.override(defaultEncoding, col.Encoding),
+			f.override(defaultType, col.Type)
 	}
 	return defaultEncoding, defaultType
 }
 
-func (formatting *valueFormatting) badFormatter(err error) valueFormatter {
+func (f *valueFormatting) badFormatter(err error) valueFormatter {
 	return func(in []byte) (string, error) {
 		return "", err
 	}
 }
 
-func (formatting *valueFormatting) hexFormatter(in []byte) (string, error) {
+func (f *valueFormatting) hexFormatter(in []byte) (string, error) {
 	return fmt.Sprintf("% x", in), nil
 }
 
-func (formatting *valueFormatting) defaultFormatter(in []byte) (string, error) {
+func (f *valueFormatting) defaultFormatter(in []byte) (string, error) {
 	return fmt.Sprintf("%q", in), nil
 }
 
-func (formatting *valueFormatting) format(
+func (f *valueFormatting) format(
 	prefix, family, column string, value []byte,
 ) (string, error) {
 	famcolumn := strings.SplitN(column, ":", 2)
@@ -396,31 +409,31 @@ func (formatting *valueFormatting) format(
 		return "", fmt.Errorf("family, %s, and column family, %s, don't match", family, fam)
 	}
 	key := [2]string{family, column}
-	formatter, got := formatting.formatters[key]
+	formatter, got := f.formatters[key]
 	if !got {
-		encoding, ctype := formatting.colEncodingType(family, column)
+		encoding, ctype := f.colEncodingType(family, column)
 		validEncoding, ctype, err :=
-			formatting.validateFormat(column, string(encoding), ctype)
+			f.validateFormat(column, string(encoding), ctype)
 		if err != nil {
-			formatter = formatting.badFormatter(err)
+			formatter = f.badFormatter(err)
 		} else {
 			switch validEncoding {
 			case bigEndian, littleEndian:
-				formatter = formatting.binaryFormatter(validEncoding, ctype)
+				formatter = f.binaryFormatter(validEncoding, ctype)
 			case hex:
-				formatter = formatting.hexFormatter
+				formatter = f.hexFormatter
 			case protocolBuffer:
-				formatter, err = formatting.pbFormatter(ctype)
+				formatter, err = f.pbFormatter(ctype)
 				// pbFormatter can return an error if underlying input PB is
 				// bad
 				if err != nil {
 					return "", err
 				}
 			case none:
-				formatter = formatting.defaultFormatter
+				formatter = f.defaultFormatter
 			}
 		}
-		formatting.formatters[key] = formatter
+		f.formatters[key] = formatter
 	}
 	formatted, err := formatter(value)
 	if err == nil {

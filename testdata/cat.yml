@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+protocol_buffer_definitions:
+  - cat.proto
+protocol_buffer_paths:
+  - testdata/
+
+
 columns:
-  col1:
-    encoding: B
+  cat:
+    encoding: ProtocolBuffer
+    type: Cat

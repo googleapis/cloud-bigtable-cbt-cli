@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -430,8 +431,7 @@ func TestValueFormattingValidateColumns(t *testing.T) {
 
 func TestValueFormattingSetup(t *testing.T) {
 	formatting := newValueFormatting()
-	err := formatting.setup(map[string]string{
-		"format-file": filepath.Join("testdata", t.Name()+".yml")})
+	err := formatting.setup(filepath.Join("testdata", t.Name()+".yml"))
 	got := fmt.Sprint(err)
 	want := "bad encoding and types:\ncol1: no type specified for encoding: B"
 
@@ -457,7 +457,7 @@ func TestValueFormattingFormat(t *testing.T) {
 	formatting.settings.Columns["address"] =
 		valueFormatColumn{Encoding: "p", Type: "tutorial.Person"}
 	formatting.settings.Columns["person"] = valueFormatColumn{Encoding: "p"}
-	err := formatting.setup(map[string]string{})
+	err := formatting.setup("")
 	if err != nil {
 		t.Errorf("Error setting up formattting: %v", err)
 	}
@@ -517,6 +517,42 @@ func TestValueFormattingFormat(t *testing.T) {
 			t.Errorf("Values formatted incorrectly: wanted %s, got %s", want,
 				got)
 		}
+	}
+}
+
+func TestProtobufferAndYAML(t *testing.T) {
+
+	globalValueFormatting = newValueFormatting()
+	globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
+
+	row := bigtable.Row{
+		"f1": {
+			bigtable.ReadItem{
+				Row:    "r1",
+				Column: "f1:cat",
+				Value:  []byte("\n\x05Brave\x10\x02"),
+			},
+		},
+	}
+	var out bytes.Buffer
+
+	printRow(row, &out)
+	got := out.String()
+	want := ("----------------------------------------\n" +
+		"r1\n" +
+		"  f1:cat\n" +
+		"    name: \"Brave\"\n" +
+		"    age: 2")
+
+	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
+
+	stripTimestamps := func(s string) string {
+		return string(timestampsRE.ReplaceAll([]byte(s), []byte("")))
+	}
+	got = stripTimestamps(got)
+
+	if !strings.Contains(got, want) {
+		t.Errorf("Formatting printed incorrectly: wanted\n%s\n,\ngot\n%s", want, got)
 	}
 }
 
@@ -581,7 +617,7 @@ func TestPrintRow(t *testing.T) {
 		valueFormatColumn{Encoding: "Binary", Type: "int16"}
 	globalValueFormatting.settings.Columns["person"] =
 		valueFormatColumn{Encoding: "ProtocolBuffer"}
-	globalValueFormatting.setup(map[string]string{})
+	globalValueFormatting.setup("")
 
 	want = ("----------------------------------------\n" +
 		"r1\n" +

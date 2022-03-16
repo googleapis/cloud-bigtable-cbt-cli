@@ -27,7 +27,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	"cloud.google.com/go/bigtable/bttest"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -269,9 +273,16 @@ func TestGetDataFilter(t *testing.T) {
 
 	for _, test := range tests {
 		parsed, err := parseArgs(test.args, valid)
-		assertNoError(t, err)
+		if err != nil {
+			t.Errorf("Error parsing arguments: %v", err)
+		}
+
 		opt, keysOnly, err := getDataFilter(parsed)
-		assertEqual(t, result{opt, keysOnly, fmt.Sprint(err)}, test.result, cmpOpts...)
+		want := result{opt, keysOnly, fmt.Sprint(err)}
+		if !cmp.Equal(want, test.result, cmpOpts) {
+			t.Fatalf("Data filter error; wanted:\n%v\n; got:\n%v",
+				want, test.result)
+		}
 	}
 }
 
@@ -352,20 +363,27 @@ func TestDoLookup(t *testing.T) {
 		doMain(&config, []string{"lookup", "mytable", "r"})
 	})
 
-	assertEqual(t, stripTimestamps(out),
-		"----------------------------------------\n"+
-			"r1\n"+
-			"  c1\n"+
-			"    \"Hello!\"\n"+
-			"  c2\n"+
-			"    \"\\x01\\x02\"\n")
+	got := stripTimestamps(out)
+	want := "----------------------------------------\n" +
+		"r1\n" +
+		"  c1\n" +
+		"    \"Hello!\"\n" +
+		"  c2\n" +
+		"    \"\\x01\\x02\"\n"
+
+	if !strings.Contains(want, got) {
+		t.Errorf("Couldn't do lookup; wanted:\n%v\ngot:\n%v", want, got)
+	}
 
 	var inopts []bigtable.ReadOption
 	expectOpts := func(opts ...bigtable.ReadOption) []bigtable.ReadOption {
 		return opts
 	}(inopts...)
 
-	assertEqual(t, ft.Opts, expectOpts)
+	if !cmp.Equal(ft.Opts, expectOpts) {
+		t.Errorf("Didn't get correct opts; wanted:\n%v\ngot:\n%v\n",
+			expectOpts, ft.Opts)
+	}
 
 	ft = &filterTable{}
 	table = ft
@@ -374,15 +392,25 @@ func TestDoLookup(t *testing.T) {
 		doMain(&config, []string{"lookup", "mytable", "r", "keys-only=t"})
 	})
 
-	assertEqual(t, stripTimestamps(out),
-		"----------------------------------------\n"+
-			"r1\n"+
-			"  c1\n"+
-			"  c2\n")
+	got = stripTimestamps(out)
+	want = "----------------------------------------\n" +
+		"r1\n" +
+		"  c1\n" +
+		"  c2\n"
 
-	assertEqual(t, ft.Opts, []bigtable.ReadOption{
+	if !strings.Contains(want, got) {
+		t.Errorf("Didn't get correct output; wanted:\n%v\n; got:\n%v\n",
+			want, got)
+	}
+
+	expectOpts = []bigtable.ReadOption{
 		bigtable.RowFilter(bigtable.StripValueFilter()),
-	}, cmpOpts...)
+	}
+
+	if !cmp.Equal(expectOpts, ft.Opts) {
+		t.Errorf("Didn't receive correct options; wanted:\n%v\n; got:\n%v\n",
+			expectOpts, ft.Opts)
+	}
 }
 
 func TestDoRead(t *testing.T) {
@@ -402,24 +430,32 @@ func TestDoRead(t *testing.T) {
 		doMain(&config, []string{"read", "mytable"})
 	})
 
-	assertEqual(t, stripTimestamps(out),
-		"----------------------------------------\n"+
-			"r1\n"+
-			"  c1\n"+
-			"    \"Hello!\"\n"+
-			"  c2\n"+
-			"    \"\\x01\\x02\"\n"+
-			"----------------------------------------\n"+
-			"r2\n"+
-			"  c1\n"+
-			"    \"Hi!\"\n")
+	want := "----------------------------------------\n" +
+		"r1\n" +
+		"  c1\n" +
+		"    \"Hello!\"\n" +
+		"  c2\n" +
+		"    \"\\x01\\x02\"\n" +
+		"----------------------------------------\n" +
+		"r2\n" +
+		"  c1\n" +
+		"    \"Hi!\"\n"
+	got := stripTimestamps(out)
+
+	if !strings.Contains(want, got) {
+		t.Errorf("Didn't print correct results; wanted:\n%v\n; got:\n %v\n",
+			want, got)
+	}
 
 	var inopts []bigtable.ReadOption
 	expectOpts := func(opts ...bigtable.ReadOption) []bigtable.ReadOption {
 		return opts
 	}(inopts...)
 
-	assertEqual(t, ft.Opts, expectOpts)
+	if !cmp.Equal(expectOpts, ft.Opts, cmpOpts) {
+		t.Errorf("Received incorrect options; wanted:\n%v\n; got:\n%v\n",
+			expectOpts, ft.Opts)
+	}
 
 	ft = &filterTable{}
 	table = ft
@@ -428,18 +464,27 @@ func TestDoRead(t *testing.T) {
 		doMain(&config, []string{"read", "mytable", "keys-only=t"})
 	})
 
-	assertEqual(t, stripTimestamps(out),
-		"----------------------------------------\n"+
-			"r1\n"+
-			"  c1\n"+
-			"  c2\n"+
-			"----------------------------------------\n"+
-			"r2\n"+
-			"  c1\n")
+	want = "----------------------------------------\n" +
+		"r1\n" +
+		"  c1\n" +
+		"  c2\n" +
+		"----------------------------------------\n" +
+		"r2\n" +
+		"  c1\n"
+	got = stripTimestamps(out)
+	if !strings.Contains(want, got) {
+		t.Errorf("Didn't print correct results; wanted:\n%v\n; got:\n %v\n",
+			want, got)
+	}
 
-	assertEqual(t, ft.Opts, []bigtable.ReadOption{
+	expectOpts = []bigtable.ReadOption{
 		bigtable.RowFilter(bigtable.StripValueFilter()),
-	}, cmpOpts...)
+	}
+
+	if !cmp.Equal(expectOpts, ft.Opts, cmpOpts) {
+		t.Errorf("Received incorrect options; wanted:\n%v\n; got:\n%v\n",
+			expectOpts, ft.Opts)
+	}
 }
 
 // Check if we get a substring of the expected error.
@@ -601,7 +646,6 @@ func TestCsvHeaderParser(t *testing.T) {
 	}
 }
 
-/*
 func setupEmulator(t *testing.T, tables, families []string) (context.Context, *bigtable.Client) {
 	srv, err := bttest.NewServer("localhost:0")
 	if err != nil {
@@ -639,7 +683,6 @@ func setupEmulator(t *testing.T, tables, families []string) (context.Context, *b
 
 	return ctx, client
 }
-*/
 
 func validateData(ctx context.Context, tbl *bigtable.Table, fams, cols []string, rowData [][]string) error {
 	// vaildate table entries, valMap["rowkey:family:column"] = mutation value
@@ -672,7 +715,6 @@ func validateData(ctx context.Context, tbl *bigtable.Table, fams, cols []string,
 	return nil
 }
 
-/*
 func TestCsvParseAndWrite(t *testing.T) {
 	ctx, client := setupEmulator(t, []string{"my-table"}, []string{"my-family", "my-family-2"})
 
@@ -849,4 +891,3 @@ func TestCsvToCbt(t *testing.T) {
 		}
 	}
 }
-*/

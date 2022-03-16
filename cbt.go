@@ -1167,7 +1167,23 @@ func doLookup(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 
-	opt, keysOnly, err := getDataFilter(parsed)
+	keysOnly := false
+	if keyStr := parsed["keys-only"]; keyStr != "" {
+		keysOnly, err = strconv.ParseBool(keyStr)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var opt bigtable.ReadOption
+	if keysOnly {
+		f := DataFilterOptions{
+			isKeysOnly:     keysOnly,
+			columns:        parsed["columns"],
+			cellsPerColumn: parsed["cells-per-column"],
+		}
+		opt, err = getDataFilter(f)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1197,37 +1213,33 @@ func doLookup(ctx context.Context, args ...string) {
 	fmt.Println(buf.String())
 }
 
-func getDataFilter(
-	parsed map[string]string, filters ...bigtable.Filter,
-) (bigtable.ReadOption, bool, error) {
-	var err error
+type DataFilterOptions struct {
+	cellsPerColumn string
+	isKeysOnly     bool
+	columns        string
+}
 
-	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
-		n, err := strconv.Atoi(cellsPerColumn)
+func getDataFilter(
+	options DataFilterOptions, filters ...bigtable.Filter,
+) (bigtable.ReadOption, error) {
+	if c := options.cellsPerColumn; c != "" {
+		n, err := strconv.Atoi(c)
 		if err != nil {
-			return nil, false, fmt.Errorf(
-				"Bad number of cells per column %q: %v",
-				cellsPerColumn, err)
+			return nil, fmt.Errorf(
+				"bad number of cells per column %q: %v",
+				c, err)
 		}
 		filters = append(filters, bigtable.LatestNFilter(n))
 	}
 
-	keysOnly := false
-	if keysOnlyS := parsed["keys-only"]; keysOnlyS != "" {
-		keysOnly, err = strconv.ParseBool(keysOnlyS)
-		if err != nil {
-			return nil, false, fmt.Errorf(
-				"Bad value for keys-only: %v", keysOnlyS)
-		}
-		if keysOnly {
-			filters = append(filters, bigtable.StripValueFilter())
-		}
+	if options.isKeysOnly {
+		filters = append(filters, bigtable.StripValueFilter())
 	}
 
-	if columns := parsed["columns"]; columns != "" {
-		columnFilters, err := parseColumnsFilter(columns)
+	if c := options.columns; c != "" {
+		columnFilters, err := parseColumnsFilter(c)
 		if err != nil {
-			return nil, keysOnly, err
+			return nil, err
 		}
 		filters = append(filters, columnFilters)
 	}
@@ -1240,7 +1252,7 @@ func getDataFilter(
 		option = bigtable.RowFilter(filters[0])
 	}
 
-	return option, keysOnly, nil
+	return option, nil
 }
 
 func printRow(r bigtable.Row, w io.Writer) {
@@ -1389,10 +1401,26 @@ func doRead(ctx context.Context, args ...string) {
 		filters = append(filters, bigtable.RowKeyFilter(regex))
 	}
 
-	opt, keysOnly, err := getDataFilter(parsed, filters...)
+	keysOnly := false
+	if keyStr := parsed["keys-only"]; keyStr != "" {
+		keysOnly, err = strconv.ParseBool(keyStr)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// TODO: Edit this
-	fmt.Println(keysOnly)
+	var opt bigtable.ReadOption
+	if keysOnly {
+		f := DataFilterOptions{
+			isKeysOnly:     keysOnly,
+			columns:        parsed["columns"],
+			cellsPerColumn: parsed["cells-per-column"],
+		}
+		opt, err = getDataFilter(f, filters...)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err != nil {
 		log.Fatal(err)

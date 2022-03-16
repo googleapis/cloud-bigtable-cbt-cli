@@ -60,12 +60,7 @@ var (
 )
 
 type tableLike interface {
-	ReadRows(
-		context.Context,
-		bigtable.RowSet,
-		func(bigtable.Row) bool,
-		...bigtable.ReadOption,
-	) error
+	ReadRows(ctx context.Context, arg bigtable.RowSet, f func(bigtable.Row) bool, opts ...bigtable.ReadOption) (err error)
 	ReadRow(context.Context, string, ...bigtable.ReadOption) (bigtable.Row, error)
 }
 
@@ -1159,6 +1154,49 @@ func doListClusters(ctx context.Context, args ...string) {
 	tw.Flush()
 }
 
+func doLookup(ctx context.Context, args ...string) {
+	if len(args) < 2 {
+		log.Fatalf("usage: cbt lookup <table> <row> [columns=<family:qualifier>...] [cells-per-column=<n>] " +
+			"[app-profile=<app profile id>]")
+	}
+
+	parsed, err := parseArgs(args[2:], []string{
+		"columns", "cells-per-column", "app-profile", "format-file", "keys-only"})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	opt, keysOnly, err := getDataFilter(parsed)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var opts []bigtable.ReadOption
+	if opt != nil {
+		opts = []bigtable.ReadOption{opt}
+	}
+
+	table, row := args[0], args[1]
+	tbl := getTable(
+		bigtable.ClientConfig{AppProfile: parsed["app-profile"]},
+		table)
+	r, err := tbl.ReadRow(ctx, row, opts...)
+	if err != nil {
+		log.Fatalf("Reading row: %v", err)
+	}
+
+	formatFilePath := parsed["format-file"]
+	err = globalValueFormatting.setup(formatFilePath)
+	if err != nil {
+		log.Fatalf("Reading row: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printRow(r, &buf)
+	fmt.Println(buf.String())
+}
+
 func getDataFilter(
 	parsed map[string]string, filters ...bigtable.Filter,
 ) (bigtable.ReadOption, bool, error) {
@@ -1203,49 +1241,6 @@ func getDataFilter(
 	}
 
 	return option, keysOnly, nil
-}
-
-func doLookup(ctx context.Context, args ...string) {
-	if len(args) < 2 {
-		log.Fatalf("usage: cbt lookup <table> <row> [columns=<family:qualifier>...] [cells-per-column=<n>] " +
-			"[app-profile=<app profile id>]")
-	}
-
-	parsed, err := parseArgs(args[2:], []string{
-		"columns", "cells-per-column", "app-profile", "format-file", "keys-only"})
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	opt, keysOnly, err := getDataFilter(parsed)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var opts []bigtable.ReadOption
-	if opt != nil {
-		opts = []bigtable.ReadOption{opt}
-	}
-
-	table, row := args[0], args[1]
-	tbl := getTable(
-		bigtable.ClientConfig{AppProfile: parsed["app-profile"]},
-		table)
-	r, err := tbl.ReadRow(ctx, row, opts...)
-	if err != nil {
-		log.Fatalf("Reading row: %v", err)
-	}
-
-	formatFilePath := parsed["format-file"]
-	err = globalValueFormatting.setup(formatFilePath)
-	if err != nil {
-		log.Fatalf("Reading row: %v", err)
-	}
-
-	var buf bytes.Buffer
-	printRow(r, &buf)
-	fmt.Println(buf.String())
 }
 
 func printRow(r bigtable.Row, w io.Writer) {

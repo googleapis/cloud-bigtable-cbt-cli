@@ -60,7 +60,13 @@ var (
 )
 
 type tableLike interface {
-	ReadRows(ctx context.Context, arg bigtable.RowSet, f func(bigtable.Row) bool, opts ...bigtable.ReadOption) (err error)
+	ReadRows(
+		context.Context,
+		bigtable.RowSet,
+		func(bigtable.Row) bool,
+		...bigtable.ReadOption,
+	) error
+	ReadRow(context.Context, string, ...bigtable.ReadOption) (bigtable.Row, error)
 }
 
 func getCredentialOpts(opts []option.ClientOption) []option.ClientOption {
@@ -1153,6 +1159,52 @@ func doListClusters(ctx context.Context, args ...string) {
 	tw.Flush()
 }
 
+func getDataFilter(
+	parsed map[string]string, filters ...bigtable.Filter,
+) (bigtable.ReadOption, bool, error) {
+	var err error
+
+	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
+		n, err := strconv.Atoi(cellsPerColumn)
+		if err != nil {
+			return nil, false, fmt.Errorf(
+				"Bad number of cells per column %q: %v",
+				cellsPerColumn, err)
+		}
+		filters = append(filters, bigtable.LatestNFilter(n))
+	}
+
+	keysOnly := false
+	if keysOnlyS := parsed["keys-only"]; keysOnlyS != "" {
+		keysOnly, err = strconv.ParseBool(keysOnlyS)
+		if err != nil {
+			return nil, false, fmt.Errorf(
+				"Bad value for keys-only: %v", keysOnlyS)
+		}
+		if keysOnly {
+			filters = append(filters, bigtable.StripValueFilter())
+		}
+	}
+
+	if columns := parsed["columns"]; columns != "" {
+		columnFilters, err := parseColumnsFilter(columns)
+		if err != nil {
+			return nil, keysOnly, err
+		}
+		filters = append(filters, columnFilters)
+	}
+
+	var option bigtable.ReadOption
+
+	if len(filters) > 1 {
+		option = bigtable.RowFilter(bigtable.ChainFilters(filters...))
+	} else if len(filters) == 1 {
+		option = bigtable.RowFilter(filters[0])
+	}
+
+	return option, keysOnly, nil
+}
+
 func doLookup(ctx context.Context, args ...string) {
 	if len(args) < 2 {
 		log.Fatalf("usage: cbt lookup <table> <row> [columns=<family:qualifier>...] [cells-per-column=<n>] " +
@@ -1160,35 +1212,26 @@ func doLookup(ctx context.Context, args ...string) {
 	}
 
 	parsed, err := parseArgs(args[2:], []string{
-		"columns", "cells-per-column", "app-profile", "format-file"})
+		"columns", "cells-per-column", "app-profile", "format-file", "keys-only"})
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	var opts []bigtable.ReadOption
-	var filters []bigtable.Filter
-	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
-		n, err := strconv.Atoi(cellsPerColumn)
-		if err != nil {
-			log.Fatalf("Bad number of cells per column %q: %v", cellsPerColumn, err)
-		}
-		filters = append(filters, bigtable.LatestNFilter(n))
-	}
-	if columns := parsed["columns"]; columns != "" {
-		columnFilters, err := parseColumnsFilter(columns)
-		if err != nil {
-			log.Fatal(err)
-		}
-		filters = append(filters, columnFilters)
+
+	opt, keysOnly, err := getDataFilter(parsed)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if len(filters) > 1 {
-		opts = append(opts, bigtable.RowFilter(bigtable.ChainFilters(filters...)))
-	} else if len(filters) == 1 {
-		opts = append(opts, bigtable.RowFilter(filters[0]))
+	var opts []bigtable.ReadOption
+	if opt != nil {
+		opts = []bigtable.ReadOption{opt}
 	}
 
 	table, row := args[0], args[1]
-	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(table)
+	tbl := getTable(
+		bigtable.ClientConfig{AppProfile: parsed["app-profile"]},
+		table)
 	r, err := tbl.ReadRow(ctx, row, opts...)
 	if err != nil {
 		log.Fatalf("Reading row: %v", err)
@@ -1314,6 +1357,7 @@ func doRead(ctx context.Context, args ...string) {
 		"start", "end", "prefix", "columns", "count",
 		"cells-per-column", "regex", "app-profile", "limit",
 		"format-file",
+		"keys-only",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -1346,28 +1390,20 @@ func doRead(ctx context.Context, args ...string) {
 	}
 
 	var filters []bigtable.Filter
-	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
-		n, err := strconv.Atoi(cellsPerColumn)
-		if err != nil {
-			log.Fatalf("Bad number of cells per column %q: %v", cellsPerColumn, err)
-		}
-		filters = append(filters, bigtable.LatestNFilter(n))
-	}
 	if regex := parsed["regex"]; regex != "" {
 		filters = append(filters, bigtable.RowKeyFilter(regex))
 	}
-	if columns := parsed["columns"]; columns != "" {
-		columnFilters, err := parseColumnsFilter(columns)
-		if err != nil {
-			log.Fatal(err)
-		}
-		filters = append(filters, columnFilters)
-	}
 
-	if len(filters) > 1 {
-		opts = append(opts, bigtable.RowFilter(bigtable.ChainFilters(filters...)))
-	} else if len(filters) == 1 {
-		opts = append(opts, bigtable.RowFilter(filters[0]))
+	opt, keysOnly, err := getDataFilter(parsed, filters...)
+
+	// TODO: Edit this
+	fmt.Println(keysOnly)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	if opt != nil {
+		opts = append(opts, opt)
 	}
 
 	formatFilePath := parsed["format-file"]
@@ -1377,7 +1413,9 @@ func doRead(ctx context.Context, args ...string) {
 	}
 
 	// TODO(dsymonds): Support filters.
-	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(args[0])
+	tbl := getTable(
+		bigtable.ClientConfig{AppProfile: parsed["app-profile"]},
+		args[0])
 	err = tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
 		var buf bytes.Buffer
 		printRow(r, &buf)

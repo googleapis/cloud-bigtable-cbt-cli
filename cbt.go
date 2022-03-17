@@ -1168,7 +1168,29 @@ func doLookup(ctx context.Context, args ...string) {
 	}
 	var opts []bigtable.ReadOption
 	var opt bigtable.ReadOption
-
+	var filters []bigtable.Filter
+	filterOpts := DataFilterOptions{}
+	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
+		n, err := strconv.Atoi(cellsPerColumn)
+		if err != nil {
+			log.Fatalf("Bad number of cells per column %q: %v", cellsPerColumn, err)
+		}
+		filterOpts.cellsPerColumn = int64(n)
+		filters = append(filters, bigtable.LatestNFilter(n))
+	}
+	if columns := parsed["columns"]; columns != "" {
+		columnFilters, err := parseColumnsFilter(columns)
+		if err != nil {
+			log.Fatal(err)
+		}
+		filterOpts.columns = columnFilters
+		filters = append(filters, columnFilters)
+	}
+	if len(filters) > 1 {
+		opts = append(opts, bigtable.RowFilter(bigtable.ChainFilters(filters...)))
+	} else if len(filters) == 1 {
+		opts = append(opts, bigtable.RowFilter(filters[0]))
+	}
 	keysOnly := false
 	if keyStr := parsed["keys-only"]; keyStr != "" {
 		keysOnly, err = strconv.ParseBool(keyStr)
@@ -1177,20 +1199,14 @@ func doLookup(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 
-	
 	if keysOnly {
-		f := DataFilterOptions{
-			isKeysOnly:     keysOnly,
-			columns:        parsed["columns"],
-			cellsPerColumn: parsed["cells-per-column"],
-		}
+
 		opt, err = getDataFilter(f)
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	
 	if opt != nil {
 		opts = []bigtable.ReadOption{opt}
 	}
@@ -1214,9 +1230,9 @@ func doLookup(ctx context.Context, args ...string) {
 }
 
 type DataFilterOptions struct {
-	cellsPerColumn string
+	cellsPerColumn int64
 	isKeysOnly     bool
-	columns        string
+	columns        bigtable.Filter
 }
 
 func getDataFilter(

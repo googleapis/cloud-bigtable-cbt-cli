@@ -277,8 +277,17 @@ func TestValueFormattingJSONFormatter(t *testing.T) {
 
 	input := []byte("{\"name\": \"Brave\", \"age\": 2, \"isFluffy\": true, \"hobbies\": { \"toys\": [ \"mousies\"]}}")
 
-	want := `age:   2.00
-name: "Brave"`
+	want := `
+age:     2.00
+hobbies: 
+  toys: 
+    [
+	  "mousies"
+	]
+	
+isFluffy: true
+name:   "Brave"
+`
 
 	got, err := f(input)
 	if err != nil {
@@ -286,7 +295,7 @@ name: "Brave"`
 	}
 
 	if !strings.Contains(got, want) {
-		t.Errorf("JSON not formatted correctly: wanted\n%v\n; got\n%v\n",
+		t.Errorf("JSON not formatted correctly; wanted:\n%v\n; got:\n%v\n",
 			want, got)
 	}
 }

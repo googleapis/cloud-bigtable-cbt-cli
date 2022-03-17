@@ -167,8 +167,8 @@ func (f *valueFormatting) binaryFormatter(
 func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 	return func(in []byte) (string, error) {
 
-		var outputJSONInterface interface{}
-		err := json.Unmarshal(in, &outputJSONInterface)
+		var outJSON interface{}
+		err := json.Unmarshal(in, &outJSON)
 		if err != nil {
 			return "", err
 		}
@@ -176,17 +176,24 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 		// Recursive inner function that returns strings from
 		// JSON values and nested JSON data structures. This forward declaration
 		// required to allow the recursion by the function.
-		var fmat func(v interface{}) string
-		fmat = func(v interface{}) string {
+		var fmat func(v interface{}, indent string) string
+		fmat = func(v interface{}, indent string) string {
 			switch t := v.(type) {
 			case string:
-				return fmt.Sprintf("%6q", t)
+				return fmt.Sprintf("%s%6q", indent, t)
 			case int:
-				return fmt.Sprintf("%6d", t)
+				return fmt.Sprintf("%s%6d", indent, t)
 			case float64:
 				// TODO: Decide whether floating-point value precision should
 				// be configurable
-				return fmt.Sprintf("%6.2f", t)
+				return fmt.Sprintf("%s%6.2f", indent, t)
+			case []interface{}:
+				s := fmt.Sprintf("\n%s[\n", indent)
+				for _, v := range t {
+					s += fmt.Sprintf("%s\n", fmat(v, fmt.Sprintf("  %s", indent)))
+				}
+				s += fmt.Sprintf("%s]", indent)
+				return s
 			case map[string]interface{}:
 
 				// Sort the keys first for alphabetical field print order
@@ -196,18 +203,18 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 				}
 				sort.Strings(keys)
 
-				var s string
+				s := "\n"
 				for _, k := range keys {
 					v := t[k]
-					fv := fmat(v)
-					s += fmt.Sprintf("%s: %v\n", k, fv)
+					fv := fmat(v, fmt.Sprintf("  %s", indent))
+					s += fmt.Sprintf("%s%s: %v\n", indent, k, fv)
 				}
 				return s
 			}
 			return fmt.Sprintf("%v", v)
 		}
 
-		return fmat(outputJSONInterface), nil
+		return fmat(outJSON, ""), nil
 	}, nil
 }
 

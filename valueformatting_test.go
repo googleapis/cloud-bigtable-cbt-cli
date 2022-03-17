@@ -275,21 +275,19 @@ func TestValueFormattingJSONFormatter(t *testing.T) {
 		t.Errorf("Error creating formatter: %v", err)
 	}
 
-	input := []byte("{\"name\": \"Brave\", \"age\": 2, \"isFluffy\": true, \"hobbies\": { \"toys\": [ \"mousies\"]}}")
-
+	s := []byte("{\"name\": \"Brave\", \"age\": 2, \"isFluffy\": true, \"hobbies\": { \"toys\": [ \"mousies\"]}}")
+	got, err := f(s)
 	want := `
 age:     2.00
 hobbies: 
   toys: 
     [
-	  "mousies"
-	]
-	
-isFluffy: true
-name:   "Brave"
-`
+      "mousies"
+    ]
 
-	got, err := f(input)
+isFluffy: true
+name:   "Brave"`
+
 	if err != nil {
 		t.Errorf("Error formatting JSON string: %v", err)
 	}

@@ -1167,7 +1167,6 @@ func doLookup(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 	var opts []bigtable.ReadOption
-	var opt bigtable.ReadOption
 	var filters []bigtable.Filter
 	if cellsPerColumn := parsed["cells-per-column"]; cellsPerColumn != "" {
 		n, err := strconv.Atoi(cellsPerColumn)
@@ -1201,10 +1200,6 @@ func doLookup(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.RowFilter(bigtable.ChainFilters(filters...)))
 	} else if len(filters) == 1 {
 		opts = append(opts, bigtable.RowFilter(filters[0]))
-	}
-
-	if opt != nil {
-		opts = []bigtable.ReadOption{opt}
 	}
 
 	table, row := args[0], args[1]

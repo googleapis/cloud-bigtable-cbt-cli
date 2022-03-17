@@ -1166,6 +1166,8 @@ func doLookup(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var opts []bigtable.ReadOption
+	var opt bigtable.ReadOption
 
 	keysOnly := false
 	if keyStr := parsed["keys-only"]; keyStr != "" {
@@ -1175,7 +1177,7 @@ func doLookup(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 
-	var opt bigtable.ReadOption
+	
 	if keysOnly {
 		f := DataFilterOptions{
 			isKeysOnly:     keysOnly,
@@ -1188,15 +1190,13 @@ func doLookup(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 
-	var opts []bigtable.ReadOption
+	
 	if opt != nil {
 		opts = []bigtable.ReadOption{opt}
 	}
 
 	table, row := args[0], args[1]
-	tbl := getTable(
-		bigtable.ClientConfig{AppProfile: parsed["app-profile"]},
-		table)
+	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(table)
 	r, err := tbl.ReadRow(ctx, row, opts...)
 	if err != nil {
 		log.Fatalf("Reading row: %v", err)

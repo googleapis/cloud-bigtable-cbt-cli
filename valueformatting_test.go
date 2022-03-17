@@ -268,25 +268,25 @@ func TestValueFormattingBinaryFormatter(t *testing.T) {
 }
 
 func TestValueFormattingJSONFormatter(t *testing.T) {
-	formatting := newValueFormatting()
-	formatter, err := formatting.jsonFormatter()
+	vf := newValueFormatting()
+	f, err := vf.jsonFormatter()
 
 	if err != nil {
 		t.Errorf("Error creating formatter: %v", err)
 	}
 
-	input := []byte("{\"name\": \"Brave\", \"age\": 2}")
+	input := []byte("{\"name\": \"Brave\", \"age\": 2, \"isFluffy\": true, \"hobbies\": { \"toys\": [ \"mousies\"]}}")
 
 	want := `age:   2.00
 name: "Brave"`
 
-	got, err := formatter(input)
+	got, err := f(input)
 	if err != nil {
 		t.Errorf("Error formatting JSON string: %v", err)
 	}
 
 	if !strings.Contains(got, want) {
-		t.Errorf("JSON not formatted correctly: wanted\n%s\n; got\n%s\n",
+		t.Errorf("JSON not formatted correctly: wanted\n%v\n; got\n%v\n",
 			want, got)
 	}
 }
@@ -546,7 +546,10 @@ func TestValueFormattingFormat(t *testing.T) {
 
 func TestJSONAndYAML(t *testing.T) {
 	globalValueFormatting = newValueFormatting()
-	globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
+	err := globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
+	if err != nil {
+		t.Errorf("Error loading YAML:\n%v", err)
+	}
 
 	row := bigtable.Row{
 		"f1": {
@@ -568,14 +571,10 @@ func TestJSONAndYAML(t *testing.T) {
 		"    name: \"Brave\"")
 
 	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
-
-	stripTimestamps := func(s string) string {
-		return string(timestampsRE.ReplaceAll([]byte(s), []byte("")))
-	}
-	got = stripTimestamps(got)
+	got = string(timestampsRE.ReplaceAll([]byte(got), []byte("")))
 
 	if !strings.Contains(got, want) {
-		t.Errorf("Formatting printed incorrectly: wanted\n%s\n,\ngot\n%s", want, got)
+		t.Errorf("Formatting printed incorrectly: wanted\n%v\n,\ngot\n%v\n", want, got)
 	}
 }
 

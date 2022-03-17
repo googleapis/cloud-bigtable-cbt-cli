@@ -163,7 +163,7 @@ func (f *valueFormatting) binaryFormatter(
 	}
 }
 
-// Returns a valueFormatter function that pretty-prints JSON values.
+// jsonFormatter returns a valueFormatter function that pretty-prints JSON values.
 func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 	return func(in []byte) (string, error) {
 
@@ -174,12 +174,13 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 		}
 
 		// Recursive inner function that returns strings from
-		// JSON values and nested JSON data structures
+		// JSON values and nested JSON data structures. This forward declaration
+		// required to allow the recursion by the function.
 		var fmat func(v interface{}) string
 		fmat = func(v interface{}) string {
 			switch t := v.(type) {
 			case string:
-				return fmt.Sprintf("%6s", fmt.Sprintf("\"%s\"", t))
+				return fmt.Sprintf("%6q", t)
 			case int:
 				return fmt.Sprintf("%6d", t)
 			case float64:
@@ -187,15 +188,15 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 				// be configurable
 				return fmt.Sprintf("%6.2f", t)
 			case map[string]interface{}:
-				s := ""
 
 				// Sort the keys first for alphabetical field print order
-				keys := make([]string, 0, len(t))
+				var keys []string
 				for k := range t {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
 
+				var s string
 				for _, k := range keys {
 					v := t[k]
 					fv := fmat(v)

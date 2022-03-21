@@ -19,8 +19,10 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
@@ -161,8 +163,64 @@ func (f *valueFormatting) binaryFormatter(
 	}
 }
 
+// jsonFormatter returns a valueFormatter function that pretty-prints JSON values.
+func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
+	return func(in []byte) (string, error) {
+
+		var outJSON interface{}
+		err := json.Unmarshal(in, &outJSON)
+		if err != nil {
+			return "", err
+		}
+
+		// Recursive inner function that returns strings from
+		// JSON values and nested JSON data structures. This forward declaration
+		// required to allow the recursion by the function.
+		var fmat func(v interface{}, indent string) string
+		fmat = func(v interface{}, indent string) string {
+			switch t := v.(type) {
+			case string:
+				return fmt.Sprintf("%s%6q", indent, t)
+			case int:
+				return fmt.Sprintf("%s%6d", indent, t)
+			case float64:
+				// TODO: Decide whether floating-point value precision should
+				// be configurable
+				return fmt.Sprintf("%s%6.2f", indent, t)
+			case []interface{}:
+				s := fmt.Sprintf("\n%s[\n", indent)
+				for _, v := range t {
+					s += fmt.Sprintf("%s\n", fmat(v, fmt.Sprintf("  %s", indent)))
+				}
+				s += fmt.Sprintf("%s]", indent)
+				return s
+			case map[string]interface{}:
+
+				// Sort the keys first for alphabetical field print order
+				var keys []string
+				for k := range t {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+
+				s := "\n"
+				for _, k := range keys {
+					v := t[k]
+					fv := fmat(v, fmt.Sprintf("  %s", indent))
+					s += fmt.Sprintf("%s%s: %v\n", indent, k, fv)
+				}
+				return s
+			}
+			return fmt.Sprintf("%v", v)
+		}
+
+		return fmat(outJSON, ""), nil
+	}, nil
+}
+
 func (f *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	md := f.pbMessageTypes[strings.ToLower(ctype)]
+
 	if md == nil {
 		return nil, fmt.Errorf("no Protocol-Buffer message time for: %v", ctype)
 	}
@@ -191,16 +249,19 @@ const (
 	littleEndian                              // encodings supported
 	protocolBuffer                            // for pretty-print
 	hex                                       // formatting
+	jsonEncoded
 )
 
 var validValueFormattingEncodings = map[string]validEncodings{
 	"bigendian":       bigEndian,
 	"b":               bigEndian,
 	"binary":          bigEndian,
-	"littleendian":    littleEndian,
-	"L":               littleEndian,
 	"hex":             hex,
 	"h":               hex,
+	"j":               jsonEncoded,
+	"json":            jsonEncoded,
+	"littleendian":    littleEndian,
+	"L":               littleEndian,
 	"protocolbuffer":  protocolBuffer,
 	"protocol-buffer": protocolBuffer,
 	"protocol_buffer": protocolBuffer,
@@ -430,6 +491,11 @@ func (f *valueFormatting) format(
 				formatter, err = f.pbFormatter(ctype)
 				// pbFormatter can return an error if underlying input PB is
 				// bad
+				if err != nil {
+					return "", err
+				}
+			case jsonEncoded:
+				formatter, err = f.jsonFormatter()
 				if err != nil {
 					return "", err
 				}

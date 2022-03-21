@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#
+# Example format file
+#
+
 protocol_buffer_definitions:
   - cat.proto
 protocol_buffer_paths:
@@ -22,3 +26,6 @@ columns:
   cat:
     encoding: ProtocolBuffer
     type: Cat
+
+  json:
+    encoding: json

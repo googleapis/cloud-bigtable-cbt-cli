@@ -404,6 +404,10 @@ func (f *valueFormatting) format(
 	prefix, family, column string, value []byte,
 ) (string, error) {
 	famcolumn := strings.SplitN(column, ":", 2)
+	if len(famcolumn) > 2 {
+		return "", fmt.Errorf("column name doesn't include family and column")
+	}
+
 	fam, column := famcolumn[0], famcolumn[1]
 	if fam != family {
 		return "", fmt.Errorf("family, %s, and column family, %s, don't match", family, fam)

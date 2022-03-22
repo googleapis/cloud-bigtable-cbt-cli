@@ -214,7 +214,8 @@ func (f *valueFormatting) jsonFormatter() (valueFormatter, error) {
 			return fmt.Sprintf("%v", v)
 		}
 
-		return fmat(outJSON, ""), nil
+		rs := fmat(outJSON, "")
+		return strings.TrimLeft(rs, "\n"), nil
 	}, nil
 }
 

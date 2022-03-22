@@ -707,3 +707,12 @@ func TestPrintRow(t *testing.T) {
 		t.Errorf("Formatting printed incorrectly: wanted %s, got %s", want, got)
 	}
 }
+
+func TestFormatBadColumnNames(t *testing.T) {
+	globalValueFormatting = newValueFormatting()
+	_, err := globalValueFormatting.format("", "fam", "nofamilynamecolumn", []byte("value not used"))
+
+	if err == nil {
+		t.Errorf("Formatter didn't throw error on bad column name")
+	}
+}

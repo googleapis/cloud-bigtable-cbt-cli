@@ -466,7 +466,7 @@ func (f *valueFormatting) format(
 	prefix, family, column string, value []byte,
 ) (string, error) {
 	famcolumn := strings.SplitN(column, ":", 2)
-	if len(famcolumn) > 2 {
+	if len(famcolumn) != 2 {
 		return "", fmt.Errorf("column name doesn't include family and column")
 	}
 

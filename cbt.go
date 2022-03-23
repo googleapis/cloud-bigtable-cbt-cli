@@ -61,6 +61,7 @@ var (
 
 type tableLike interface {
 	ReadRows(ctx context.Context, arg bigtable.RowSet, f func(bigtable.Row) bool, opts ...bigtable.ReadOption) (err error)
+	ReadRow(context.Context, string, ...bigtable.ReadOption) (bigtable.Row, error)
 }
 
 func getCredentialOpts(opts []option.ClientOption) []option.ClientOption {
@@ -1160,7 +1161,8 @@ func doLookup(ctx context.Context, args ...string) {
 	}
 
 	parsed, err := parseArgs(args[2:], []string{
-		"columns", "cells-per-column", "app-profile", "format-file"})
+		"columns", "cells-per-column", "app-profile", "format-file", "keys-only"})
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1181,6 +1183,20 @@ func doLookup(ctx context.Context, args ...string) {
 		filters = append(filters, columnFilters)
 	}
 
+	var keysOnly bool
+	if keyStr := parsed["keys-only"]; keyStr != "" {
+		keysOnly, err = strconv.ParseBool(keyStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if keysOnly {
+		filters = append(filters, bigtable.StripValueFilter())
+	}
+
+	// Gather up all of the filters being applied and determine whether we
+	// need to chain them together.
 	if len(filters) > 1 {
 		opts = append(opts, bigtable.RowFilter(bigtable.ChainFilters(filters...)))
 	} else if len(filters) == 1 {
@@ -1314,6 +1330,7 @@ func doRead(ctx context.Context, args ...string) {
 		"start", "end", "prefix", "columns", "count",
 		"cells-per-column", "regex", "app-profile", "limit",
 		"format-file",
+		"keys-only",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -1362,6 +1379,17 @@ func doRead(ctx context.Context, args ...string) {
 			log.Fatal(err)
 		}
 		filters = append(filters, columnFilters)
+	}
+	var keysOnly bool
+	if keyStr := parsed["keys-only"]; keyStr != "" {
+		keysOnly, err = strconv.ParseBool(keyStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if keysOnly {
+		filters = append(filters, bigtable.StripValueFilter())
 	}
 
 	if len(filters) > 1 {

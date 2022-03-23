@@ -38,6 +38,14 @@ func (ct *ctxTable) ReadRows(
 	return nil
 }
 
+func (ct *ctxTable) ReadRow(
+	ctx context.Context,
+	row string,
+	opts ...bigtable.ReadOption,
+) (bigtable.Row, error) {
+	return nil, nil
+}
+
 func TestTimeout(t *testing.T) {
 	ctxt := ctxTable{}
 	table = &ctxt

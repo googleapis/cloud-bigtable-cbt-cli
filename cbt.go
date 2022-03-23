@@ -1380,13 +1380,14 @@ func doRead(ctx context.Context, args ...string) {
 		}
 		filters = append(filters, columnFilters)
 	}
-	keysOnly := false
+	var keysOnly bool
 	if keyStr := parsed["keys-only"]; keyStr != "" {
 		keysOnly, err = strconv.ParseBool(keyStr)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	if keysOnly {
 		filters = append(filters, bigtable.StripValueFilter())
 	}

@@ -277,8 +277,7 @@ func TestValueFormattingJSONFormatter(t *testing.T) {
 
 	s := []byte("{\"name\": \"Brave\", \"age\": 2, \"isFluffy\": true, \"hobbies\": { \"toys\": [ \"mousies\"]}}")
 	got, err := f(s)
-	want := `
-age:     2.00
+	want := `age:     2.00
 hobbies: 
   toys: 
     [
@@ -574,8 +573,8 @@ func TestJSONAndYAML(t *testing.T) {
 	want := ("----------------------------------------\n" +
 		"r1\n" +
 		"  f1:json\n" +
-		"    age:   2.00\n" +
-		"    name: \"Brave\"")
+		"    age:     2.00\n" +
+		"    name:   \"Brave\"")
 
 	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
 	got = string(timestampsRE.ReplaceAll([]byte(got), []byte("")))
@@ -705,5 +704,14 @@ func TestPrintRow(t *testing.T) {
 	got = stripTimestamps(out2.String())
 	if got != want {
 		t.Errorf("Formatting printed incorrectly: wanted %s, got %s", want, got)
+	}
+}
+
+func TestFormatBadColumnNames(t *testing.T) {
+	globalValueFormatting = newValueFormatting()
+	_, err := globalValueFormatting.format("", "fam", "nofamilynamecolumn", []byte("value not used"))
+
+	if err == nil {
+		t.Errorf("Formatter didn't throw error on bad column name")
 	}
 }

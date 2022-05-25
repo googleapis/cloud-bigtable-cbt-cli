@@ -678,41 +678,41 @@ var commands = []struct {
 	},
 	{
 		Name: "createtablefromsnapshot",
-		Desc: "Create a table from a snapshot (snapshots alpha)",
+		Desc: "Create a table from a backup",
 		do:   doCreateTableFromSnapshot,
-		Usage: "cbt createtablefromsnapshot <table> <cluster> <snapshot>\n" +
+		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
 			"  table        The name of the table to create\n" +
 			"  cluster      The cluster where the snapshot is located\n" +
-			"  snapshot     The snapshot to restore\n",
+			"  backup       The snapshot to restore\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "createsnapshot",
-		Desc: "Create a snapshot from a source table (snapshots alpha)",
+		Desc: "Create a backup from a source table",
 		do:   doSnapshotTable,
-		Usage: "cbt createsnapshot <cluster> <snapshot> <table> [ttl=<d>]\n" +
-			`  [ttl=<d>]        Lifespan of the snapshot (e.g. "1h", "4d")`,
+		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
+			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
 		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name:     "listsnapshots",
-		Desc:     "List snapshots in a cluster (snapshots alpha)",
+		Desc:     "List backups in a cluster",
 		do:       doListSnapshots,
 		Usage:    "cbt listsnapshots [<cluster>]",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name:     "getsnapshot",
-		Desc:     "Get snapshot info (snapshots alpha)",
+		Desc:     "Get backups info ",
 		do:       doGetSnapshot,
-		Usage:    "cbt getsnapshot <cluster> <snapshot>",
+		Usage:    "cbt getsnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name:     "deletesnapshot",
-		Desc:     "Delete snapshot in a cluster (snapshots alpha)",
+		Desc:     "Delete snapshot in a cluster",
 		do:       doDeleteSnapshot,
-		Usage:    "cbt deletesnapshot <cluster> <snapshot>",
+		Usage:    "cbt deletesnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1490,23 +1490,26 @@ func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {
 	return -1, fmt.Errorf("invalid storage type: %v, must be SSD or HDD", storageTypeStr)
 }
 
+// NOTE: Previous version of this feature was called "snapshots"
 func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
 	if len(args) != 3 {
-		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <snapshot>")
+		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <backup>")
 	}
 	tableName := args[0]
 	clusterName := args[1]
-	snapshotName := args[2]
-	err := getAdminClient().CreateTableFromSnapshot(ctx, tableName, clusterName, snapshotName)
+	backupName := args[2]
+
+	err := getAdminClient().RestoreTableFrom(ctx, config.Instance, tableName, clusterName, backupName)
 
 	if err != nil {
 		log.Fatalf("Creating table: %v", err)
 	}
 }
 
+// NOTE: Previous version of this feature was called "snapshots"
 func doSnapshotTable(ctx context.Context, args ...string) {
 	if len(args) != 3 && len(args) != 4 {
-		log.Fatal("usage: cbt createsnapshot <cluster> <snapshot> <table> [ttl=<d>]")
+		log.Fatal("usage: cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]")
 	}
 	clusterName := args[0]
 	snapshotName := args[1]
@@ -1525,76 +1528,82 @@ func doSnapshotTable(ctx context.Context, args ...string) {
 		}
 	}
 
-	err = getAdminClient().SnapshotTable(ctx, tableName, clusterName, snapshotName, ttl)
+	t := time.Now()
+	t.Add(ttl)
+
+	err = getAdminClient().CreateBackup(ctx, tableName, clusterName, snapshotName, t)
 	if err != nil {
 		log.Fatalf("Failed to create Snapshot: %v", err)
 	}
 }
 
+// NOTE: Previous version of this feature was called "snapshots"
 func doListSnapshots(ctx context.Context, args ...string) {
 	if len(args) != 0 && len(args) != 1 {
 		log.Fatal("usage: cbt listsnapshots [<cluster>]")
 	}
 
-	var cluster string
+	var cl string
 
 	if len(args) == 0 {
-		cluster = "-"
+		cl = "-"
 	} else {
-		cluster = args[0]
+		cl = args[0]
 	}
 
-	it := getAdminClient().Snapshots(ctx, cluster)
+	it := getAdminClient().Backups(ctx, cl)
 
 	tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
-	fmt.Fprintf(tw, "Snapshot\tSource Table\tCreated At\tExpires At\n")
-	fmt.Fprintf(tw, "--------\t------------\t----------\t----------\n")
-	timeLayout := "2006-01-02 15:04 MST"
+	fmt.Fprintf(tw, "Backup\tSource Table\tCreated At\tExpires At\n")
+	fmt.Fprintf(tw, "------\t------------\t----------\t----------\n")
+	tf := "2006-01-02 15:04 MST"
 
 	for {
-		snapshot, err := it.Next()
+		b, err := it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
 			log.Fatalf("Failed to fetch snapshots %v", err)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", snapshot.Name, snapshot.SourceTable, snapshot.CreateTime.Format(timeLayout), snapshot.DeleteTime.Format(timeLayout))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", b.Name, b.SourceTable, b.StartTime.Format(tf), b.ExpireTime.Format(tf))
 	}
 	tw.Flush()
 }
 
+// NOTE: Previous version of this feature was called "snapshots"
 func doGetSnapshot(ctx context.Context, args ...string) {
 	if len(args) != 2 {
-		log.Fatalf("usage: cbt getsnapshot <cluster> <snapshot>")
+		log.Fatalf("usage: cbt getsnapshot <cluster> <backup>")
 	}
-	clusterName := args[0]
-	snapshotName := args[1]
+	c := args[0]
+	bName := args[1]
 
-	snapshot, err := getAdminClient().SnapshotInfo(ctx, clusterName, snapshotName)
+	b, err := getAdminClient().BackupInfo(ctx, c, bName)
 	if err != nil {
-		log.Fatalf("Failed to get snapshot: %v", err)
+		log.Fatalf("Failed to get backup: %v", err)
 	}
 
-	timeLayout := "2006-01-02 15:04 MST"
+	tf := "2006-01-02 15:04 MST"
 
-	fmt.Printf("Name: %s\n", snapshot.Name)
-	fmt.Printf("Source table: %s\n", snapshot.SourceTable)
-	fmt.Printf("Created at: %s\n", snapshot.CreateTime.Format(timeLayout))
-	fmt.Printf("Expires at: %s\n", snapshot.DeleteTime.Format(timeLayout))
+	fmt.Printf("Name: %s\n", b.Name)
+	fmt.Printf("Source table: %s\n", b.SourceTable)
+	fmt.Printf("Created at: %s\n", b.StartTime.Format(tf))
+	fmt.Printf("Expires at: %s\n", b.ExpireTime.Format(tf))
 }
 
+// NOTE: Previous version of this feature was called "snapshots"
 func doDeleteSnapshot(ctx context.Context, args ...string) {
 	if len(args) != 2 {
-		log.Fatal("usage: cbt deletesnapshot <cluster> <snapshot>")
+		log.Fatal("usage: cbt deletesnapshot <cluster> <backup>")
 	}
-	cluster := args[0]
-	snapshot := args[1]
+	cl := args[0]
+	b := args[1]
 
-	err := getAdminClient().DeleteSnapshot(ctx, cluster, snapshot)
+	err := getAdminClient().DeleteBackup(ctx, cl, b)
 
 	if err != nil {
-		log.Fatalf("Failed to delete snapshot: %v", err)
+		log.Fatalf("Failed to delete backup: %v", err)
 	}
 }
 

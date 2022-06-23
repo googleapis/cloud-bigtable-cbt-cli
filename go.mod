@@ -6,18 +6,18 @@ require (
 	cloud.google.com/go/bigtable v1.13.0
 	github.com/google/go-cmp v0.5.8
 	github.com/jhump/protoreflect v1.12.0 // Third-party dependency; proceed with caution
-	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
-	google.golang.org/api v0.81.0
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c
+	google.golang.org/api v0.85.0
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/yaml.v2 v2.2.8 // Third-party dependency; proceed with caution
 )
 
 require (
-	cloud.google.com/go v0.100.2 // indirect
-	cloud.google.com/go/compute v1.6.1 // indirect
-	cloud.google.com/go/iam v0.1.1 // indirect
+	cloud.google.com/go v0.102.0 // indirect
+	cloud.google.com/go/compute v1.7.0 // indirect
+	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4 // indirect
@@ -27,12 +27,14 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.0.1 // indirect
+	github.com/google/uuid v1.1.2 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
+	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
+	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )

@@ -3,7 +3,7 @@ module cloud.google.com/go/cbt
 go 1.17
 
 require (
-	cloud.google.com/go/bigtable v1.13.0
+	cloud.google.com/go/bigtable v1.15.0
 	github.com/google/go-cmp v0.5.8
 	github.com/jhump/protoreflect v1.12.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.102.0 // indirect
+	cloud.google.com/go v0.102.1 // indirect
 	cloud.google.com/go/compute v1.7.0 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.2.1 // indirect
@@ -26,7 +26,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/btree v1.0.1 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect

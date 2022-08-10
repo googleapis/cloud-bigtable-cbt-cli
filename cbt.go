@@ -630,6 +630,7 @@ var commands = []struct {
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
 			"  count=<n>                           Read only this many rows\n" +
 			"  cells-per-column=<n>                Read only this many cells per column\n" +
+			"  cells-per-row=<n>                   Read only this many cells per row\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
 			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
 			"\n" +
@@ -1328,7 +1329,7 @@ func doRead(ctx context.Context, args ...string) {
 
 	parsed, err := parseArgs(args[1:], []string{
 		"start", "end", "prefix", "columns", "count",
-		"cells-per-column", "regex", "app-profile", "limit",
+		"cells-per-column", "cells-per-row", "regex", "app-profile", "limit",
 		"format-file",
 		"keys-only",
 	})
@@ -1369,6 +1370,13 @@ func doRead(ctx context.Context, args ...string) {
 			log.Fatalf("Bad number of cells per column %q: %v", cellsPerColumn, err)
 		}
 		filters = append(filters, bigtable.LatestNFilter(n))
+	}
+	if cellsPerRow := parsed["cells-per-row"]; cellsPerRow != "" {
+		n, err := strconv.Atoi(cellsPerRow)
+		if err != nil {
+			log.Fatalf("Bad number of cells per row %q: %v", cellsPerRow, err)
+		}
+		filters = append(filters, bigtable.CellsPerRowLimitFilter(n))
 	}
 	if regex := parsed["regex"]; regex != "" {
 		filters = append(filters, bigtable.RowKeyFilter(regex))

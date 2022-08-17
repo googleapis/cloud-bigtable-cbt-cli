@@ -1,6 +1,6 @@
 module cloud.google.com/go/cbt
 
-go 1.17
+go 1.19
 
 require (
 	cloud.google.com/go/bigtable v1.13.0
@@ -9,7 +9,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
 	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664
 	google.golang.org/api v0.91.0
-	google.golang.org/grpc v1.47.0
+	google.golang.org/grpc v1.48.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/yaml.v2 v2.2.8 // Third-party dependency; proceed with caution
 )

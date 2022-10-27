@@ -21,11 +21,19 @@ protocol_buffer_definitions:
 protocol_buffer_paths:
   - testdata/
 
+avro_schema_paths:
+  io.animal.Cat: 
+    - testdata/cat_with_color.avsc
+    - testdata/cat.avsc
 
 columns:
   cat:
     encoding: ProtocolBuffer
     type: Cat
+
+  avro:
+    encoding: a
+    type: io.animal.Cat
 
   json:
     encoding: json

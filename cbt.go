@@ -331,6 +331,10 @@ All values are optional and can be overridden at the command prompt.
 // ` + "`" + `columns` + "`" + `
 // : A mapping from column names to column objects.
 
+// ` + "`" + `avro_schema_paths` + "`" + `
+// : A map of type - avsc schema files defining
+// : available schemas per record.
+
 // ` + "`" + `families` + "`" + `
 // : A mapping from family names to family objects.
 

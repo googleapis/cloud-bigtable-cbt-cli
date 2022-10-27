@@ -328,6 +328,10 @@ The YAML file provides an object with optional properties:
 : need not be provided for standard
 : protocol-buffer imports.
 
+` + "`" + `avro_schema_paths` + "`" + `
+: A map of type - avsc schema files defining
+: available schemas per record.
+
 ` + "`" + `columns` + "`" + `
 : A mapping from column names to column objects.
 

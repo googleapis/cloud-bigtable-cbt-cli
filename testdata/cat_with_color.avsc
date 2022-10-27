@@ -1,0 +1,10 @@
+{
+
+ "type": "record",
+ "name": "Cat",
+ "fields": [
+     {"name": "name", "type": "string"},
+     {"name": "age",  "type": "int"},
+     {"name": "color",  "type": "int"}
+ ]
+}

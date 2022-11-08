@@ -45,6 +45,7 @@ type Config struct {
 	DataEndpoint      string                           // optional
 	CertFile          string                           // optional
 	UserAgent         string                           // optional
+	AccessToken       string                           // optional
 	AuthToken         string                           // optional
 	Timeout           time.Duration                    // optional
 	TokenSource       oauth2.TokenSource               // derived
@@ -75,6 +76,7 @@ func (c *Config) RegisterFlags() {
 	flag.StringVar(&c.DataEndpoint, "data-endpoint", c.DataEndpoint, "Override the data api endpoint")
 	flag.StringVar(&c.CertFile, "cert-file", c.CertFile, "Override the TLS certificates file")
 	flag.StringVar(&c.UserAgent, "user-agent", c.UserAgent, "Override the user agent string")
+	flag.StringVar(&c.AccessToken, "access-token", c.AccessToken, "if set, use access token for requests")
 	flag.StringVar(&c.AuthToken, "auth-token", c.AuthToken, "if set, use IAM Auth Token for requests")
 	flag.DurationVar(&c.Timeout, "timeout", c.Timeout,
 		"Timeout (e.g. 10s, 100ms, 5m )")
@@ -97,7 +99,13 @@ func (c *Config) CheckFlags(required RequiredFlags) error {
 		c.TLSCreds = credentials.NewTLS(&tls.Config{RootCAs: cp})
 	}
 	if required != NoneRequired {
+		if c.Creds != "" && c.AccessToken != "" {
+			return fmt.Errorf("-creds and -access-token should not both be specified")
+		}
 		c.SetFromGcloud()
+		if c.AccessToken != "" {
+			c.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: c.AccessToken})
+		}
 	}
 	if required&ProjectRequired != 0 && c.Project == "" {
 		missing = append(missing, "-project")
@@ -236,13 +244,15 @@ func LoadGcloudConfig(gcloudCmd string, gcloudCmdArgs []string) (*GcloudConfig, 
 // configuration if possible possible
 func (c *Config) SetFromGcloud() error {
 
-	if c.Creds == "" {
-		c.Creds = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if c.AccessToken == "" {
 		if c.Creds == "" {
-			log.Printf("-creds flag unset, will use gcloud credential")
+			c.Creds = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+			if c.Creds == "" {
+				log.Printf("-creds flag unset, will use gcloud credential")
+			}
+		} else {
+			os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", c.Creds)
 		}
-	} else {
-		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", c.Creds)
 	}
 
 	if c.Project == "" {
@@ -272,7 +282,7 @@ func (c *Config) SetFromGcloud() error {
 		c.Project = gcloudConfig.Configuration.Properties.Core.Project
 	}
 
-	if c.Creds == "" {
+	if c.AccessToken == "" && c.Creds == "" {
 		c.TokenSource = oauth2.ReuseTokenSource(
 			gcloudConfig.Credential.Token(),
 			&GcloudCmdTokenSource{Command: gcloudCmd, Args: gcloudCmdArgs})

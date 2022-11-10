@@ -588,13 +588,14 @@ var commands = []struct {
 		Name: "lookup",
 		Desc: "Read from a single row",
 		do:   doLookup,
-		Usage: "cbt lookup <table-id> <row-key> [columns=<family>:<qualifier>,...] [cells-per-column=<n>] " +
+		Usage: "cbt lookup <table-id> <row-key> [columns=<family>:<qualifier>,...] [cells-per-column=<n>]" +
 			" [app-profile=<app profile id>]\n" +
 			"  row-key                             String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
 			"  cells-per-column=<n>                Read only this number of cells per column\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
 			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
+			"  include-stats=full                  Include a summary of request stats at the end of the request\n" +
 			"\n" +
 			" Example: cbt lookup mobile-time-series phone#4c410523#20190501 columns=stats_summary:os_build,os_name cells-per-column=1\n" +
 			" Example: cbt lookup mobile-time-series $'\\x41\\x42'",
@@ -632,6 +633,7 @@ var commands = []struct {
 			"  cells-per-column=<n>                Read only this many cells per column\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
 			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
+			"  include-stats=full                  Include a summary of request stats at the end of the request\n" +
 			"\n" +
 			"    Examples: (see 'set' examples to create data to read)\n" +
 			"      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10\n" +
@@ -1154,6 +1156,31 @@ func doListClusters(ctx context.Context, args ...string) {
 	tw.Flush()
 }
 
+func printFullReadStats(stats *bigtable.FullReadStats) {
+	readStats := stats.ReadIterationStats
+	latencyStats := stats.RequestLatencyStats
+	fmt.Println("Summary Stats")
+	fmt.Println(strings.Repeat("=", 20))
+	fmt.Printf("rows_seen_count: %d\n", readStats.RowsSeenCount)
+	fmt.Printf("rows_returned_count: %d\n", readStats.RowsReturnedCount)
+	fmt.Printf("cells_seen_count: %d\n", readStats.CellsSeenCount)
+	fmt.Printf("cells_returned_count: %d\n", readStats.CellsReturnedCount)
+	fmt.Printf("frontend_server_latency: %dms\n", latencyStats.FrontendServerLatency.Milliseconds())
+	fmt.Println("")
+}
+
+func makeFullReadStatsOption(statsChannel *chan *bigtable.FullReadStats) bigtable.ReadOption {
+	// Return a callback that sends stats through a channel. This ensures that stats are
+	// printed after rows. We cannot print in this callback, because stats would come before
+	// row output in doLookup().
+	return bigtable.WithFullReadStats(func(stats *bigtable.FullReadStats) {
+		select {
+		case *statsChannel <- stats:
+		default:
+		}
+	})
+}
+
 func doLookup(ctx context.Context, args ...string) {
 	if len(args) < 2 {
 		log.Fatalf("usage: cbt lookup <table> <row> [columns=<family:qualifier>...] [cells-per-column=<n>] " +
@@ -1161,7 +1188,7 @@ func doLookup(ctx context.Context, args ...string) {
 	}
 
 	parsed, err := parseArgs(args[2:], []string{
-		"columns", "cells-per-column", "app-profile", "format-file", "keys-only"})
+		"columns", "cells-per-column", "app-profile", "format-file", "keys-only", "include-stats"})
 
 	if err != nil {
 		log.Fatal(err)
@@ -1203,6 +1230,16 @@ func doLookup(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.RowFilter(filters[0]))
 	}
 
+	statsChannel := make(chan *bigtable.FullReadStats, 1)
+	includeStats := parsed["include-stats"]
+	switch includeStats {
+	case "":
+	case "full":
+		opts = append(opts, makeFullReadStatsOption(&statsChannel))
+	default:
+		log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
+	}
+
 	table, row := args[0], args[1]
 	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(table)
 	r, err := tbl.ReadRow(ctx, row, opts...)
@@ -1219,6 +1256,14 @@ func doLookup(ctx context.Context, args ...string) {
 	var buf bytes.Buffer
 	printRow(r, &buf)
 	fmt.Println(buf.String())
+	select {
+	case stats := <-statsChannel:
+		printFullReadStats(stats)
+	default:
+		if includeStats != "" {
+			log.Fatalf("Stats were requested but not received.")
+		}
+	}
 }
 
 func printRow(r bigtable.Row, w io.Writer) {
@@ -1329,8 +1374,7 @@ func doRead(ctx context.Context, args ...string) {
 	parsed, err := parseArgs(args[1:], []string{
 		"start", "end", "prefix", "columns", "count",
 		"cells-per-column", "regex", "app-profile", "limit",
-		"format-file",
-		"keys-only",
+		"format-file", "keys-only", "include-stats",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -1360,6 +1404,16 @@ func doRead(ctx context.Context, args ...string) {
 			log.Fatalf("Bad count %q: %v", count, err)
 		}
 		opts = append(opts, bigtable.LimitRows(n))
+	}
+
+	statsChannel := make(chan *bigtable.FullReadStats, 1)
+	includeStats := parsed["include-stats"]
+	switch includeStats {
+	case "":
+	case "full":
+		opts = append(opts, makeFullReadStatsOption(&statsChannel))
+	default:
+		log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
 	}
 
 	var filters []bigtable.Filter
@@ -1414,6 +1468,14 @@ func doRead(ctx context.Context, args ...string) {
 	}, opts...)
 	if err != nil {
 		log.Fatalf("Reading rows: %v", err)
+	}
+	select {
+	case stats := <-statsChannel:
+		printFullReadStats(stats)
+	default:
+		if includeStats != "" {
+			log.Fatalf("Stats were requested but not received.")
+		}
 	}
 }
 

@@ -1169,12 +1169,15 @@ func printFullReadStats(stats *bigtable.FullReadStats) {
 	fmt.Println("")
 }
 
-func makeFullReadStatsOption(stats **bigtable.FullReadStats) bigtable.ReadOption {
+func makeFullReadStatsOption(statsChannel *chan *bigtable.FullReadStats) bigtable.ReadOption {
 	// Return a callback that copies the stats pointer. This is used to ensure that stats
 	// are printed after rows. We cannot print in this callback, because stats would come
 	// before row output in doLookup().
-	return bigtable.WithFullReadStats(func(response *bigtable.FullReadStats) {
-		*stats = response
+	return bigtable.WithFullReadStats(func(stats *bigtable.FullReadStats) {
+		select {
+		case *statsChannel <- stats:
+		default:
+		}
 	})
 }
 
@@ -1227,14 +1230,14 @@ func doLookup(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.RowFilter(filters[0]))
 	}
 
-	var stats *bigtable.FullReadStats
-	if includeStats := parsed["include-stats"]; includeStats != "" {
-		switch includeStats {
-		case "full":
-			opts = append(opts, makeFullReadStatsOption(&stats))
-		default:
-			log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
-		}
+	statsChannel := make(chan *bigtable.FullReadStats, 1)
+	includeStats := parsed["include-stats"]
+	switch includeStats {
+	case "":
+	case "full":
+		opts = append(opts, makeFullReadStatsOption(&statsChannel))
+	default:
+		log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
 	}
 
 	table, row := args[0], args[1]
@@ -1253,8 +1256,13 @@ func doLookup(ctx context.Context, args ...string) {
 	var buf bytes.Buffer
 	printRow(r, &buf)
 	fmt.Println(buf.String())
-	if stats != nil {
+	select {
+	case stats := <-statsChannel:
 		printFullReadStats(stats)
+	default:
+		if includeStats != "" {
+			log.Fatalf("Stats were requested but not received.")
+		}
 	}
 }
 
@@ -1398,14 +1406,14 @@ func doRead(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.LimitRows(n))
 	}
 
-	var stats *bigtable.FullReadStats
-	if includeStats := parsed["include-stats"]; includeStats != "" {
-		switch includeStats {
-		case "full":
-			opts = append(opts, makeFullReadStatsOption(&stats))
-		default:
-			log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
-		}
+	statsChannel := make(chan *bigtable.FullReadStats, 1)
+	includeStats := parsed["include-stats"]
+	switch includeStats {
+	case "":
+	case "full":
+		opts = append(opts, makeFullReadStatsOption(&statsChannel))
+	default:
+		log.Fatalf("Bad include-stats value: %q is not one of the supported stats views.", includeStats)
 	}
 
 	var filters []bigtable.Filter
@@ -1461,8 +1469,13 @@ func doRead(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("Reading rows: %v", err)
 	}
-	if stats != nil {
+	select {
+	case stats := <-statsChannel:
 		printFullReadStats(stats)
+	default:
+		if includeStats != "" {
+			log.Fatalf("Stats were requested but not received.")
+		}
 	}
 }
 

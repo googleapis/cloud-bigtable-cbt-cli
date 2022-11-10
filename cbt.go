@@ -1170,9 +1170,9 @@ func printFullReadStats(stats *bigtable.FullReadStats) {
 }
 
 func makeFullReadStatsOption(statsChannel *chan *bigtable.FullReadStats) bigtable.ReadOption {
-	// Return a callback that copies the stats pointer. This is used to ensure that stats
-	// are printed after rows. We cannot print in this callback, because stats would come
-	// before row output in doLookup().
+	// Return a callback that sends stats through a channel. This ensures that stats are
+	// printed after rows. We cannot print in this callback, because stats would come before
+	// row output in doLookup().
 	return bigtable.WithFullReadStats(func(stats *bigtable.FullReadStats) {
 		select {
 		case *statsChannel <- stats:

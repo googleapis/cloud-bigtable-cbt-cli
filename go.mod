@@ -14,6 +14,8 @@ require (
 	gopkg.in/yaml.v2 v2.2.8 // Third-party dependency; proceed with caution
 )
 
+// IMPORTANT: If this ever changes, ensure that THIRD_PARTY_NOTICES.txt is
+// updated accordingly.
 require (
 	cloud.google.com/go v0.106.0 // indirect
 	cloud.google.com/go/compute v1.12.1 // indirect

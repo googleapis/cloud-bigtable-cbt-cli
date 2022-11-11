@@ -197,6 +197,15 @@ Apache 2.0
    See the License for the specific language governing permissions and
    limitations under the License.
 
+----------------------------------------
+NOTICES
+----------------------------------------
+
+protoc-gen-validate
+Copyright 2019 Envoy Project Authors
+
+Licensed under Apache License 2.0. See LICENSE for terms.
+
 --------------------------------------------------------------------------------
 rsc.io/binaryregexp
 BSD 3-Clause

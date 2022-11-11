@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -57,6 +58,9 @@ var (
 	revision     = "<unknown revision>"
 	revisionDate = "<unknown revision date>"
 	cliUserAgent = "cbt-cli-go/unknown"
+
+	//go:embed THIRD_PARTY_NOTICES.txt
+	noticesContents []byte
 )
 
 type tableLike interface {
@@ -406,6 +410,13 @@ var commands = []struct {
 	Usage      string
 	Required   RequiredFlags
 }{
+	{
+		Name:     "notices",
+		Desc:     "Display licence information for any third-party dependencies",
+		do:       doNotices,
+		Usage:    "cbt notices",
+		Required: NoneRequired,
+	},
 	{
 		Name:     "count",
 		Desc:     "Count rows in a table",
@@ -768,6 +779,10 @@ var commands = []struct {
 			"    Example: cbt deleteappprofile my-instance single-cluster",
 		Required: ProjectAndInstanceRequired,
 	},
+}
+
+func doNotices(ctx context.Context, args ...string) {
+	fmt.Println(string(noticesContents))
 }
 
 func doCount(ctx context.Context, args ...string) {

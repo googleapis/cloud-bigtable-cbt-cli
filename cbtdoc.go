@@ -17,9 +17,9 @@
 //go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
 
 /*
-The `cbt` tool is a command-line tool that allows you to interact with Cloud Bigtable.
-See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the `cbt` tool.
-Before you use the `cbt` tool, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
+The `cbt` CLI is a command-line interface that allows you to interact with Cloud Bigtable.
+See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the `cbt` CLI.
+Before you use the `cbt` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
 The examples on this page use [sample data](https://cloud.google.com/bigtable/docs/using-filters#data) similar to data
 that you might store in Bigtable.
@@ -87,7 +87,7 @@ Preview features are not currently available to most Cloud Bigtable customers. A
 features might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
-Syntax rules for the Bash shell apply to the `cbt` tool. This means, for example,
+Syntax rules for the Bash shell apply to the `cbt` CLI. This means, for example,
 that you must put quotes around values that contain spaces or operators. It also means that
 if a value is arbitrary bytes, you need to prefix it with a dollar sign and use single quotes.
 
@@ -415,6 +415,7 @@ Usage:
 	  cells-per-column=<n>                Read only this number of cells per column
 	  app-profile=<app-profile-id>        The app profile ID to use for the request
 	  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request
+	  keys-only=<true|false>              Whether to print only row keys
 	  include-stats=full                  Include a summary of request stats at the end of the request
 
 	 Example: cbt lookup mobile-time-series phone#4c410523#20190501 columns=stats_summary:os_build,os_name cells-per-column=1
@@ -449,6 +450,7 @@ Usage:
 	  cells-per-column=<n>                Read only this many cells per column
 	  app-profile=<app-profile-id>        The app profile ID to use for the request
 	  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request
+	  keys-only=<true|false>              Whether to print only row keys
 	  include-stats=full                  Include a summary of request stats at the end of the request
 
 	    Examples: (see 'set' examples to create data to read)

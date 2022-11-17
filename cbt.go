@@ -606,6 +606,7 @@ var commands = []struct {
 			"  cells-per-column=<n>                Read only this number of cells per column\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
 			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
+			"  keys-only=<true|false>              Whether to print only row keys\n" +
 			"  include-stats=full                  Include a summary of request stats at the end of the request\n" +
 			"\n" +
 			" Example: cbt lookup mobile-time-series phone#4c410523#20190501 columns=stats_summary:os_build,os_name cells-per-column=1\n" +
@@ -644,6 +645,7 @@ var commands = []struct {
 			"  cells-per-column=<n>                Read only this many cells per column\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
 			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
+			"  keys-only=<true|false>              Whether to print only row keys\n" +
 			"  include-stats=full                  Include a summary of request stats at the end of the request\n" +
 			"\n" +
 			"    Examples: (see 'set' examples to create data to read)\n" +

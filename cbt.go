@@ -223,7 +223,7 @@ Preview features are not currently available to most Cloud Bigtable customers. A
 features might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
-Syntax rules for the Bash shell apply to the ` + "`cbt`" + ` tool. This means, for example,
+Syntax rules for the Bash shell apply to the ` + "`cbt`" + ` CLI. This means, for example,
 that you must put quotes around values that contain spaces or operators. It also means that
 if a value is arbitrary bytes, you need to prefix it with a dollar sign and use single quotes.
 
@@ -375,9 +375,9 @@ Here's an example of a format file:` + "\n```" + `
 ` + "```" + `
 `
 
-const docIntroTemplate = `The ` + "`cbt`" + ` tool is a command-line tool that allows you to interact with Cloud Bigtable.
-See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` tool.
-Before you use the ` + "`cbt`" + ` tool, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
+const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that allows you to interact with Cloud Bigtable.
+See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
+Before you use the ` + "`cbt`" + ` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
 The examples on this page use [sample data](https://cloud.google.com/bigtable/docs/using-filters#data) similar to data
 that you might store in Bigtable.

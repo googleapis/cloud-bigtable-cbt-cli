@@ -17,8 +17,8 @@
 //go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
 
 /*
-The `cbt` CLI is a command-line interface that allows you to interact with Cloud Bigtable.
-See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the `cbt` CLI.
+The `cbt` CLI is a command-line interface that lets you interact with Cloud Bigtable.
+See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the `cbt` CLI.
 Before you use the `cbt` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
 The examples on this page use [sample data](https://cloud.google.com/bigtable/docs/using-filters#data) similar to data
@@ -544,8 +544,8 @@ Usage:
 	  force:  Optional flag to override any warnings causing the command to fail
 
 	    Examples:
-	      cbt createappprofile my-instance multi-cluster "Routes to nearest available cluster" route-any
-	      cbt createappprofile my-instance single-cluster "Europe routing" route-to=my-instance-c2
+	      cbt createappprofile my-instance multi-cluster-app-profile-1 "Routes to nearest available cluster" route-any
+	      cbt createappprofile my-instance single-cluster-app-profile-1 "Europe routing" route-to=my-instance-cluster-2
 
 # Read app profile for an instance
 
@@ -566,7 +566,7 @@ Usage:
 	cbt updateappprofile  <instance-id> <profile-id> <description>(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force]
 	  force:  Optional flag to override any warnings causing the command to fail
 
-	    Example: cbt updateappprofile my-instance multi-cluster "Use this one." route-any
+	    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 "Use this one." route-any
 
 # Delete app profile for an instance
 

@@ -375,8 +375,8 @@ Here's an example of a format file:` + "\n```" + `
 ` + "```" + `
 `
 
-const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that allows you to interact with Cloud Bigtable.
-See the [cbt overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
+const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Cloud Bigtable.
+See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
 Before you use the ` + "`cbt`" + ` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
 The examples on this page use [sample data](https://cloud.google.com/bigtable/docs/using-filters#data) similar to data
@@ -745,8 +745,8 @@ var commands = []struct {
 			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
 			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
 			"    Examples:\n" +
-			"      cbt createappprofile my-instance multi-cluster \"Routes to nearest available cluster\" route-any\n" +
-			"      cbt createappprofile my-instance single-cluster \"Europe routing\" route-to=my-instance-c2",
+			"      cbt createappprofile my-instance multi-cluster-app-profile-1 \"Routes to nearest available cluster\" route-any\n" +
+			"      cbt createappprofile my-instance single-cluster-app-profile-1 \"Europe routing\" route-to=my-instance-cluster-2",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -770,7 +770,7 @@ var commands = []struct {
 		Usage: "cbt updateappprofile  <instance-id> <profile-id> <description>" +
 			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
 			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
-			"    Example: cbt updateappprofile my-instance multi-cluster \"Use this one.\" route-any",
+			"    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 \"Use this one.\" route-any",
 		Required: ProjectAndInstanceRequired,
 	},
 	{

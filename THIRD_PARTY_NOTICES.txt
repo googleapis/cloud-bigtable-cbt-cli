@@ -268,7 +268,7 @@ Copyright 2019 LinkedIn Corp.
 Licensed under Apache License 2.0. See LICENSE for terms.
 
 --------------------------------------------------------------------------------
-https://github.com/golang/snapp
+https://github.com/golang/snappy
 BSD 3-Clause
 --------------------------------------------------------------------------------
 

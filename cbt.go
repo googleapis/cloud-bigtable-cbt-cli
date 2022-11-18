@@ -411,13 +411,6 @@ var commands = []struct {
 	Required   RequiredFlags
 }{
 	{
-		Name:     "notices",
-		Desc:     "Display licence information for any third-party dependencies",
-		do:       doNotices,
-		Usage:    "cbt notices",
-		Required: NoneRequired,
-	},
-	{
 		Name:     "count",
 		Desc:     "Count rows in a table",
 		do:       doCount,
@@ -425,18 +418,16 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "createinstance",
-		Desc: "Create an instance with an initial cluster",
-		do:   doCreateInstance,
-		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n" +
-			"  instance-id      Permanent, unique ID for the instance\n" +
-			"  display-name     Description of the instance\n" +
-			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
-			"  zone             The zone in which to create the cluster\n" +
-			"  num-nodes        The number of nodes to create\n" +
-			"  storage-type     SSD or HDD\n\n" +
-			"    Example: cbt createinstance my-instance \"My instance\" my-instance-c1 us-central1-b 3 SSD",
-		Required: ProjectRequired,
+		Name: "createappprofile",
+		Desc: "Create app profile for an instance",
+		do:   doCreateAppProfile,
+		Usage: "cbt createappprofile <instance-id> <app-profile-id> <description> " +
+			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
+			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
+			"    Examples:\n" +
+			"      cbt createappprofile my-instance multi-cluster-app-profile-1 \"Routes to nearest available cluster\" route-any\n" +
+			"      cbt createappprofile my-instance single-cluster-app-profile-1 \"Europe routing\" route-to=my-instance-cluster-2",
+		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "createcluster",
@@ -459,6 +450,28 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "createinstance",
+		Desc: "Create an instance with an initial cluster",
+		do:   doCreateInstance,
+		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n" +
+			"  instance-id      Permanent, unique ID for the instance\n" +
+			"  display-name     Description of the instance\n" +
+			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
+			"  zone             The zone in which to create the cluster\n" +
+			"  num-nodes        The number of nodes to create\n" +
+			"  storage-type     SSD or HDD\n\n" +
+			"    Example: cbt createinstance my-instance \"My instance\" my-instance-c1 us-central1-b 3 SSD",
+		Required: ProjectRequired,
+	},
+	{
+		Name: "createsnapshot",
+		Desc: "Create a backup from a source table",
+		do:   doSnapshotTable,
+		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
+			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "createtable",
 		Desc: "Create a table",
 		do:   doCreateTable,
@@ -472,22 +485,30 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "updatecluster",
-		Desc: "Update a cluster in the configured instance",
-		do:   doUpdateCluster,
-		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n" +
-			"  cluster-id    Permanent, unique ID for the cluster in the instance\n" +
-			"  num-nodes     The new number of nodes\n\n" +
-			"    Example: cbt updatecluster my-instance-c1 num-nodes=5",
+		Name: "createtablefromsnapshot",
+		Desc: "Create a table from a backup",
+		do:   doCreateTableFromSnapshot,
+		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
+			"  table        The name of the table to create\n" +
+			"  cluster      The cluster where the snapshot is located\n" +
+			"  backup       The snapshot to restore\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "deleteinstance",
-		Desc: "Delete an instance",
-		do:   doDeleteInstance,
-		Usage: "cbt deleteinstance <instance-id>\n\n" +
-			"    Example: cbt deleteinstance my-instance",
-		Required: ProjectRequired,
+		Name: "deleteallrows",
+		Desc: "Delete all rows",
+		do:   doDeleteAllRows,
+		Usage: "cbt deleteallrows <table-id>\n\n" +
+			"    Example: cbt deleteallrows  mobile-time-series",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "deleteappprofile",
+		Desc: "Delete app profile for an instance",
+		do:   doDeleteAppProfile,
+		Usage: "cbt deleteappprofile <instance-id> <profile-id>\n\n" +
+			"    Example: cbt deleteappprofile my-instance single-cluster",
+		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "deletecluster",
@@ -515,6 +536,14 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "deleteinstance",
+		Desc: "Delete an instance",
+		do:   doDeleteInstance,
+		Usage: "cbt deleteinstance <instance-id>\n\n" +
+			"    Example: cbt deleteinstance my-instance",
+		Required: ProjectRequired,
+	},
+	{
 		Name: "deleterow",
 		Desc: "Delete a row",
 		do:   doDeleteRow,
@@ -524,11 +553,10 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "deleteallrows",
-		Desc: "Delete all rows",
-		do:   doDeleteAllRows,
-		Usage: "cbt deleteallrows <table-id>\n\n" +
-			"    Example: cbt deleteallrows  mobile-time-series",
+		Name:     "deletesnapshot",
+		Desc:     "Delete snapshot in a cluster",
+		do:       doDeleteSnapshot,
+		Usage:    "cbt deletesnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -545,6 +573,20 @@ var commands = []struct {
 		do:       doDoc,
 		Usage:    "cbt doc",
 		Required: NoneRequired,
+	},
+	{
+		Name:     "getappprofile",
+		Desc:     "Read app profile for an instance",
+		do:       doGetAppProfile,
+		Usage:    "cbt getappprofile <instance-id> <profile-id>",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name:     "getsnapshot",
+		Desc:     "Get backups info ",
+		do:       doGetSnapshot,
+		Usage:    "cbt getsnapshot <cluster> <backup>",
+		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "help",
@@ -582,6 +624,20 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name:     "listappprofile",
+		Desc:     "Lists app profile for an instance",
+		do:       doListAppProfiles,
+		Usage:    "cbt listappprofile <instance-id> ",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name:     "listclusters",
+		Desc:     "List clusters in an instance",
+		do:       doListClusters,
+		Usage:    "cbt listclusters",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "listinstances",
 		Desc:     "List instances in a project",
 		do:       doListInstances,
@@ -589,10 +645,10 @@ var commands = []struct {
 		Required: ProjectRequired,
 	},
 	{
-		Name:     "listclusters",
-		Desc:     "List clusters in an instance",
-		do:       doListClusters,
-		Usage:    "cbt listclusters",
+		Name:     "listsnapshots",
+		Desc:     "List backups in a cluster",
+		do:       doListSnapshots,
+		Usage:    "cbt listsnapshots [<cluster>]",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -627,6 +683,13 @@ var commands = []struct {
 		Desc:     "Print documentation for cbt in Markdown format",
 		do:       doMDDoc,
 		Usage:    "cbt mddoc",
+		Required: NoneRequired,
+	},
+	{
+		Name:     "notices",
+		Desc:     "Display licence information for any third-party dependencies",
+		do:       doNotices,
+		Usage:    "cbt notices",
 		Required: NoneRequired,
 	},
 	{
@@ -685,85 +748,6 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name:     "waitforreplication",
-		Desc:     "Block until all the completed writes have been replicated to all the clusters",
-		do:       doWaitForReplicaiton,
-		Usage:    "cbt waitforreplication <table-id>\n",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name: "createtablefromsnapshot",
-		Desc: "Create a table from a backup",
-		do:   doCreateTableFromSnapshot,
-		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
-			"  table        The name of the table to create\n" +
-			"  cluster      The cluster where the snapshot is located\n" +
-			"  backup       The snapshot to restore\n",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name: "createsnapshot",
-		Desc: "Create a backup from a source table",
-		do:   doSnapshotTable,
-		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
-			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "listsnapshots",
-		Desc:     "List backups in a cluster",
-		do:       doListSnapshots,
-		Usage:    "cbt listsnapshots [<cluster>]",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "getsnapshot",
-		Desc:     "Get backups info ",
-		do:       doGetSnapshot,
-		Usage:    "cbt getsnapshot <cluster> <backup>",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "deletesnapshot",
-		Desc:     "Delete snapshot in a cluster",
-		do:       doDeleteSnapshot,
-		Usage:    "cbt deletesnapshot <cluster> <backup>",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "version",
-		Desc:     "Print the current cbt version",
-		do:       doVersion,
-		Usage:    "cbt version",
-		Required: NoneRequired,
-	},
-	{
-		Name: "createappprofile",
-		Desc: "Create app profile for an instance",
-		do:   doCreateAppProfile,
-		Usage: "cbt createappprofile <instance-id> <app-profile-id> <description> " +
-			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
-			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
-			"    Examples:\n" +
-			"      cbt createappprofile my-instance multi-cluster-app-profile-1 \"Routes to nearest available cluster\" route-any\n" +
-			"      cbt createappprofile my-instance single-cluster-app-profile-1 \"Europe routing\" route-to=my-instance-cluster-2",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "getappprofile",
-		Desc:     "Read app profile for an instance",
-		do:       doGetAppProfile,
-		Usage:    "cbt getappprofile <instance-id> <profile-id>",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "listappprofile",
-		Desc:     "Lists app profile for an instance",
-		do:       doListAppProfiles,
-		Usage:    "cbt listappprofile <instance-id> ",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
 		Name: "updateappprofile",
 		Desc: "Update app profile for an instance",
 		do:   doUpdateAppProfile,
@@ -774,11 +758,27 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "deleteappprofile",
-		Desc: "Delete app profile for an instance",
-		do:   doDeleteAppProfile,
-		Usage: "cbt deleteappprofile <instance-id> <profile-id>\n\n" +
-			"    Example: cbt deleteappprofile my-instance single-cluster",
+		Name: "updatecluster",
+		Desc: "Update a cluster in the configured instance",
+		do:   doUpdateCluster,
+		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n" +
+			"  cluster-id    Permanent, unique ID for the cluster in the instance\n" +
+			"  num-nodes     The new number of nodes\n\n" +
+			"    Example: cbt updatecluster my-instance-c1 num-nodes=5",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name:     "version",
+		Desc:     "Print the current cbt version",
+		do:       doVersion,
+		Usage:    "cbt version",
+		Required: NoneRequired,
+	},
+	{
+		Name:     "waitforreplication",
+		Desc:     "Block until all the completed writes have been replicated to all the clusters",
+		do:       doWaitForReplicaiton,
+		Usage:    "cbt waitforreplication <table-id>\n",
 		Required: ProjectAndInstanceRequired,
 	},
 }

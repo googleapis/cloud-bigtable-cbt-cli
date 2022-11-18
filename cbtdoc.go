@@ -30,43 +30,43 @@ Usage:
 
 The commands are:
 
-	notices                   Display licence information for any third-party dependencies
 	count                     Count rows in a table
-	createinstance            Create an instance with an initial cluster
+	createappprofile          Create app profile for an instance
 	createcluster             Create a cluster in the configured instance
 	createfamily              Create a column family
+	createinstance            Create an instance with an initial cluster
+	createsnapshot            Create a backup from a source table
 	createtable               Create a table
-	updatecluster             Update a cluster in the configured instance
-	deleteinstance            Delete an instance
+	createtablefromsnapshot   Create a table from a backup
+	deleteallrows             Delete all rows
+	deleteappprofile          Delete app profile for an instance
 	deletecluster             Delete a cluster from the configured instance
 	deletecolumn              Delete all cells in a column
 	deletefamily              Delete a column family
+	deleteinstance            Delete an instance
 	deleterow                 Delete a row
-	deleteallrows             Delete all rows
+	deletesnapshot            Delete snapshot in a cluster
 	deletetable               Delete a table
 	doc                       Print godoc-suitable documentation for cbt
+	getappprofile             Read app profile for an instance
+	getsnapshot               Get backups info
 	help                      Print help text
 	import                    Batch write many rows based on the input file
-	listinstances             List instances in a project
+	listappprofile            Lists app profile for an instance
 	listclusters              List clusters in an instance
+	listinstances             List instances in a project
+	listsnapshots             List backups in a cluster
 	lookup                    Read from a single row
 	ls                        List tables and column families
 	mddoc                     Print documentation for cbt in Markdown format
+	notices                   Display licence information for any third-party dependencies
 	read                      Read rows
 	set                       Set value of a cell (write)
 	setgcpolicy               Set the garbage-collection policy (age, versions) for a column family
-	waitforreplication        Block until all the completed writes have been replicated to all the clusters
-	createtablefromsnapshot   Create a table from a backup
-	createsnapshot            Create a backup from a source table
-	listsnapshots             List backups in a cluster
-	getsnapshot               Get backups info
-	deletesnapshot            Delete snapshot in a cluster
-	version                   Print the current cbt version
-	createappprofile          Create app profile for an instance
-	getappprofile             Read app profile for an instance
-	listappprofile            Lists app profile for an instance
 	updateappprofile          Update app profile for an instance
-	deleteappprofile          Delete app profile for an instance
+	updatecluster             Update a cluster in the configured instance
+	version                   Print the current cbt version
+	waitforreplication        Block until all the completed writes have been replicated to all the clusters
 
 The options are:
 
@@ -222,31 +222,22 @@ Here's an example of a format file:
 
 ```
 
-# Display licence information for any third-party dependencies
-
-Usage:
-
-	cbt notices
-
 # Count rows in a table
 
 Usage:
 
 	cbt count <table-id>
 
-# Create an instance with an initial cluster
+# Create app profile for an instance
 
 Usage:
 
-	cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>
-	  instance-id      Permanent, unique ID for the instance
-	  display-name     Description of the instance
-	  cluster-id       Permanent, unique ID for the cluster in the instance
-	  zone             The zone in which to create the cluster
-	  num-nodes        The number of nodes to create
-	  storage-type     SSD or HDD
+	cbt createappprofile <instance-id> <app-profile-id> <description> (route-any | [ route-to=<cluster-id> : transactional-writes]) [-force]
+	  force:  Optional flag to override any warnings causing the command to fail
 
-	    Example: cbt createinstance my-instance "My instance" my-instance-c1 us-central1-b 3 SSD
+	    Examples:
+	      cbt createappprofile my-instance multi-cluster-app-profile-1 "Routes to nearest available cluster" route-any
+	      cbt createappprofile my-instance single-cluster-app-profile-1 "Europe routing" route-to=my-instance-cluster-2
 
 # Create a cluster in the configured instance
 
@@ -268,6 +259,27 @@ Usage:
 
 	    Example: cbt createfamily mobile-time-series stats_summary
 
+# Create an instance with an initial cluster
+
+Usage:
+
+	cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>
+	  instance-id      Permanent, unique ID for the instance
+	  display-name     Description of the instance
+	  cluster-id       Permanent, unique ID for the cluster in the instance
+	  zone             The zone in which to create the cluster
+	  num-nodes        The number of nodes to create
+	  storage-type     SSD or HDD
+
+	    Example: cbt createinstance my-instance "My instance" my-instance-c1 us-central1-b 3 SSD
+
+# Create a backup from a source table
+
+Usage:
+
+	cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]
+	  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")
+
 # Create a table
 
 Usage:
@@ -281,23 +293,30 @@ Usage:
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
 
-# Update a cluster in the configured instance
+# Create a table from a backup
 
 Usage:
 
-	cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]
-	  cluster-id    Permanent, unique ID for the cluster in the instance
-	  num-nodes     The new number of nodes
+	cbt createtablefromsnapshot <table> <cluster> <backup>
+	  table        The name of the table to create
+	  cluster      The cluster where the snapshot is located
+	  backup       The snapshot to restore
 
-	    Example: cbt updatecluster my-instance-c1 num-nodes=5
-
-# Delete an instance
+# Delete all rows
 
 Usage:
 
-	cbt deleteinstance <instance-id>
+	cbt deleteallrows <table-id>
 
-	    Example: cbt deleteinstance my-instance
+	    Example: cbt deleteallrows  mobile-time-series
+
+# Delete app profile for an instance
+
+Usage:
+
+	cbt deleteappprofile <instance-id> <profile-id>
+
+	    Example: cbt deleteappprofile my-instance single-cluster
 
 # Delete a cluster from the configured instance
 
@@ -324,6 +343,14 @@ Usage:
 
 	    Example: cbt deletefamily mobile-time-series stats_summary
 
+# Delete an instance
+
+Usage:
+
+	cbt deleteinstance <instance-id>
+
+	    Example: cbt deleteinstance my-instance
+
 # Delete a row
 
 Usage:
@@ -333,13 +360,11 @@ Usage:
 
 	    Example: cbt deleterow mobile-time-series phone#4c410523#20190501
 
-# Delete all rows
+# Delete snapshot in a cluster
 
 Usage:
 
-	cbt deleteallrows <table-id>
-
-	    Example: cbt deleteallrows  mobile-time-series
+	cbt deletesnapshot <cluster> <backup>
 
 # Delete a table
 
@@ -354,6 +379,18 @@ Usage:
 Usage:
 
 	cbt doc
+
+# Read app profile for an instance
+
+Usage:
+
+	cbt getappprofile <instance-id> <profile-id>
+
+# Get backups info
+
+Usage:
+
+	cbt getsnapshot <cluster> <backup>
 
 # Print help text
 
@@ -393,17 +430,29 @@ Usage:
 	    cbt import csv-import-table data.csv
 	    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5
 
-# List instances in a project
+# Lists app profile for an instance
 
 Usage:
 
-	cbt listinstances
+	cbt listappprofile <instance-id>
 
 # List clusters in an instance
 
 Usage:
 
 	cbt listclusters
+
+# List instances in a project
+
+Usage:
+
+	cbt listinstances
+
+# List backups in a cluster
+
+Usage:
+
+	cbt listsnapshots [<cluster>]
 
 # Read from a single row
 
@@ -435,6 +484,12 @@ Usage:
 Usage:
 
 	cbt mddoc
+
+# Display licence information for any third-party dependencies
+
+Usage:
+
+	cbt notices
 
 # Read rows
 
@@ -490,75 +545,6 @@ Usage:
 	      cbt setgcpolicy mobile-time-series stats_detail maxage=10d
 	      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1
 
-# Block until all the completed writes have been replicated to all the clusters
-
-Usage:
-
-	cbt waitforreplication <table-id>
-
-# Create a table from a backup
-
-Usage:
-
-	cbt createtablefromsnapshot <table> <cluster> <backup>
-	  table        The name of the table to create
-	  cluster      The cluster where the snapshot is located
-	  backup       The snapshot to restore
-
-# Create a backup from a source table
-
-Usage:
-
-	cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]
-	  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")
-
-# List backups in a cluster
-
-Usage:
-
-	cbt listsnapshots [<cluster>]
-
-# Get backups info
-
-Usage:
-
-	cbt getsnapshot <cluster> <backup>
-
-# Delete snapshot in a cluster
-
-Usage:
-
-	cbt deletesnapshot <cluster> <backup>
-
-# Print the current cbt version
-
-Usage:
-
-	cbt version
-
-# Create app profile for an instance
-
-Usage:
-
-	cbt createappprofile <instance-id> <app-profile-id> <description> (route-any | [ route-to=<cluster-id> : transactional-writes]) [-force]
-	  force:  Optional flag to override any warnings causing the command to fail
-
-	    Examples:
-	      cbt createappprofile my-instance multi-cluster-app-profile-1 "Routes to nearest available cluster" route-any
-	      cbt createappprofile my-instance single-cluster-app-profile-1 "Europe routing" route-to=my-instance-cluster-2
-
-# Read app profile for an instance
-
-Usage:
-
-	cbt getappprofile <instance-id> <profile-id>
-
-# Lists app profile for an instance
-
-Usage:
-
-	cbt listappprofile <instance-id>
-
 # Update app profile for an instance
 
 Usage:
@@ -568,12 +554,26 @@ Usage:
 
 	    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 "Use this one." route-any
 
-# Delete app profile for an instance
+# Update a cluster in the configured instance
 
 Usage:
 
-	cbt deleteappprofile <instance-id> <profile-id>
+	cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]
+	  cluster-id    Permanent, unique ID for the cluster in the instance
+	  num-nodes     The new number of nodes
 
-	    Example: cbt deleteappprofile my-instance single-cluster
+	    Example: cbt updatecluster my-instance-c1 num-nodes=5
+
+# Print the current cbt version
+
+Usage:
+
+	cbt version
+
+# Block until all the completed writes have been replicated to all the clusters
+
+Usage:
+
+	cbt waitforreplication <table-id>
 */
 package main

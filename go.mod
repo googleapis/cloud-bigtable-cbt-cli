@@ -5,7 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/bigtable v1.18.0
 	github.com/google/go-cmp v0.5.9
-	github.com/jhump/protoreflect v1.14.0 // Third-party dependency; proceed with caution
+	github.com/jhump/protoreflect v1.14.1 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.2.0
 	golang.org/x/sys v0.2.0
 	google.golang.org/api v0.103.0

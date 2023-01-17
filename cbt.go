@@ -793,11 +793,15 @@ func doCount(ctx context.Context, args ...string) {
 	}
 	tbl := getTable(bigtable.ClientConfig{}, args[0])
 
+	filter := bigtable.ChainFilters(
+		bigtable.CellsPerRowLimitFilter(1),
+		bigtable.StripValueFilter(),
+	)
 	n := 0
 	err := tbl.ReadRows(ctx, bigtable.InfiniteRange(""), func(_ bigtable.Row) bool {
 		n++
 		return true
-	}, bigtable.RowFilter(bigtable.StripValueFilter()))
+	}, bigtable.RowFilter(filter))
 	if err != nil {
 		log.Fatalf("Reading rows: %v", err)
 	}

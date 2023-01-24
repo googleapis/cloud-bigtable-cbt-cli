@@ -35,9 +35,7 @@ The commands are:
 	createcluster             Create a cluster in the configured instance
 	createfamily              Create a column family
 	createinstance            Create an instance with an initial cluster
-	createsnapshot            Create a backup from a source table
 	createtable               Create a table
-	createtablefromsnapshot   Create a table from a backup
 	deleteallrows             Delete all rows
 	deleteappprofile          Delete app profile for an instance
 	deletecluster             Delete a cluster from the configured instance
@@ -45,17 +43,14 @@ The commands are:
 	deletefamily              Delete a column family
 	deleteinstance            Delete an instance
 	deleterow                 Delete a row
-	deletesnapshot            Delete snapshot in a cluster
 	deletetable               Delete a table
 	doc                       Print godoc-suitable documentation for cbt
 	getappprofile             Read app profile for an instance
-	getsnapshot               Get backups info
 	help                      Print help text
 	import                    Batch write many rows based on the input file
 	listappprofile            Lists app profile for an instance
 	listclusters              List clusters in an instance
 	listinstances             List instances in a project
-	listsnapshots             List backups in a cluster
 	lookup                    Read from a single row
 	ls                        List tables and column families
 	mddoc                     Print documentation for cbt in Markdown format
@@ -273,13 +268,6 @@ Usage:
 
 	    Example: cbt createinstance my-instance "My instance" my-instance-c1 us-central1-b 3 SSD
 
-# Create a backup from a source table
-
-Usage:
-
-	cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]
-	  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")
-
 # Create a table
 
 Usage:
@@ -292,15 +280,6 @@ Usage:
 	  splits       Row key(s) where the table should initially be split
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
-
-# Create a table from a backup
-
-Usage:
-
-	cbt createtablefromsnapshot <table> <cluster> <backup>
-	  table        The name of the table to create
-	  cluster      The cluster where the snapshot is located
-	  backup       The snapshot to restore
 
 # Delete all rows
 
@@ -360,12 +339,6 @@ Usage:
 
 	    Example: cbt deleterow mobile-time-series phone#4c410523#20190501
 
-# Delete snapshot in a cluster
-
-Usage:
-
-	cbt deletesnapshot <cluster> <backup>
-
 # Delete a table
 
 Usage:
@@ -385,12 +358,6 @@ Usage:
 Usage:
 
 	cbt getappprofile <instance-id> <profile-id>
-
-# Get backups info
-
-Usage:
-
-	cbt getsnapshot <cluster> <backup>
 
 # Print help text
 
@@ -447,12 +414,6 @@ Usage:
 Usage:
 
 	cbt listinstances
-
-# List backups in a cluster
-
-Usage:
-
-	cbt listsnapshots [<cluster>]
 
 # Read from a single row
 

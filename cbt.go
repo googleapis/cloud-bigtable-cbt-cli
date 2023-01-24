@@ -464,14 +464,6 @@ var commands = []struct {
 		Required: ProjectRequired,
 	},
 	{
-		Name: "createsnapshot",
-		Desc: "Create a backup from a source table",
-		do:   doSnapshotTable,
-		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
-			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
-		Required: ProjectAndInstanceRequired,
-	},
-	{
 		Name: "createtable",
 		Desc: "Create a table",
 		do:   doCreateTable,
@@ -482,16 +474,6 @@ var commands = []struct {
 			"               see \"setgcpolicy\".\n" +
 			"  splits       Row key(s) where the table should initially be split\n\n" +
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name: "createtablefromsnapshot",
-		Desc: "Create a table from a backup",
-		do:   doCreateTableFromSnapshot,
-		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
-			"  table        The name of the table to create\n" +
-			"  cluster      The cluster where the snapshot is located\n" +
-			"  backup       The snapshot to restore\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -553,13 +535,6 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name:     "deletesnapshot",
-		Desc:     "Delete snapshot in a cluster",
-		do:       doDeleteSnapshot,
-		Usage:    "cbt deletesnapshot <cluster> <backup>",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
 		Name: "deletetable",
 		Desc: "Delete a table",
 		do:   doDeleteTable,
@@ -579,13 +554,6 @@ var commands = []struct {
 		Desc:     "Read app profile for an instance",
 		do:       doGetAppProfile,
 		Usage:    "cbt getappprofile <instance-id> <profile-id>",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name:     "getsnapshot",
-		Desc:     "Get backups info ",
-		do:       doGetSnapshot,
-		Usage:    "cbt getsnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -643,13 +611,6 @@ var commands = []struct {
 		do:       doListInstances,
 		Usage:    "cbt listinstances",
 		Required: ProjectRequired,
-	},
-	{
-		Name:     "listsnapshots",
-		Desc:     "List backups in a cluster",
-		do:       doListSnapshots,
-		Usage:    "cbt listsnapshots [<cluster>]",
-		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "lookup",
@@ -1571,123 +1532,6 @@ func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {
 		return bigtable.HDD, nil
 	}
 	return -1, fmt.Errorf("invalid storage type: %v, must be SSD or HDD", storageTypeStr)
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
-	if len(args) != 3 {
-		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <backup>")
-	}
-	tableName := args[0]
-	clusterName := args[1]
-	backupName := args[2]
-
-	err := getAdminClient().RestoreTableFrom(ctx, config.Instance, tableName, clusterName, backupName)
-
-	if err != nil {
-		log.Fatalf("Creating table: %v", err)
-	}
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doSnapshotTable(ctx context.Context, args ...string) {
-	if len(args) != 3 && len(args) != 4 {
-		log.Fatal("usage: cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]")
-	}
-	clusterName := args[0]
-	snapshotName := args[1]
-	tableName := args[2]
-	ttl := bigtable.DefaultSnapshotDuration
-
-	parsed, err := parseArgs(args[3:], []string{"ttl"})
-	if err != nil {
-		log.Fatal(err)
-	}
-	if val, ok := parsed["ttl"]; ok {
-		var err error
-		ttl, err = parseDuration(val)
-		if err != nil {
-			log.Fatalf("Invalid snapshot ttl value %q: %v", val, err)
-		}
-	}
-
-	t := time.Now()
-	t.Add(ttl)
-
-	err = getAdminClient().CreateBackup(ctx, tableName, clusterName, snapshotName, t)
-	if err != nil {
-		log.Fatalf("Failed to create Snapshot: %v", err)
-	}
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doListSnapshots(ctx context.Context, args ...string) {
-	if len(args) != 0 && len(args) != 1 {
-		log.Fatal("usage: cbt listsnapshots [<cluster>]")
-	}
-
-	var cl string
-
-	if len(args) == 0 {
-		cl = "-"
-	} else {
-		cl = args[0]
-	}
-
-	it := getAdminClient().Backups(ctx, cl)
-
-	tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
-	fmt.Fprintf(tw, "Backup\tSource Table\tCreated At\tExpires At\n")
-	fmt.Fprintf(tw, "------\t------------\t----------\t----------\n")
-	tf := "2006-01-02 15:04 MST"
-
-	for {
-		b, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Fatalf("Failed to fetch snapshots %v", err)
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", b.Name, b.SourceTable, b.StartTime.Format(tf), b.ExpireTime.Format(tf))
-	}
-	tw.Flush()
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doGetSnapshot(ctx context.Context, args ...string) {
-	if len(args) != 2 {
-		log.Fatalf("usage: cbt getsnapshot <cluster> <backup>")
-	}
-	c := args[0]
-	bName := args[1]
-
-	b, err := getAdminClient().BackupInfo(ctx, c, bName)
-	if err != nil {
-		log.Fatalf("Failed to get backup: %v", err)
-	}
-
-	tf := "2006-01-02 15:04 MST"
-
-	fmt.Printf("Name: %s\n", b.Name)
-	fmt.Printf("Source table: %s\n", b.SourceTable)
-	fmt.Printf("Created at: %s\n", b.StartTime.Format(tf))
-	fmt.Printf("Expires at: %s\n", b.ExpireTime.Format(tf))
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doDeleteSnapshot(ctx context.Context, args ...string) {
-	if len(args) != 2 {
-		log.Fatal("usage: cbt deletesnapshot <cluster> <backup>")
-	}
-	cl := args[0]
-	b := args[1]
-
-	err := getAdminClient().DeleteBackup(ctx, cl, b)
-
-	if err != nil {
-		log.Fatalf("Failed to delete backup: %v", err)
-	}
 }
 
 func doCreateAppProfile(ctx context.Context, args ...string) {

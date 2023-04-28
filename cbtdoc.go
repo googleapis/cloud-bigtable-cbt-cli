@@ -226,7 +226,7 @@ Here's an example of a format file:
 
 Usage:
 
-	cbt count <table-id>
+	cbt count <table-id> [prefix=<row-key-prefix>]
 
 # Create app profile for an instance
 

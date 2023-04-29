@@ -11,7 +11,7 @@ require (
 	google.golang.org/api v0.103.0
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/yaml.v2 v2.2.8 // Third-party dependency; proceed with caution
+	gopkg.in/yaml.v3 v3.0.1 // Third-party dependency; proceed with caution
 )
 
 // IMPORTANT: If this ever changes, ensure that THIRD_PARTY_NOTICES.txt is

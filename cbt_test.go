@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -430,6 +431,11 @@ func validateData(ctx context.Context, tbl *bigtable.Table, fams, cols []string,
 			for _, column := range cf {
 				k := data[0] + ":" + string(column.Column)
 				v, ok := valMap[k]
+				if i := strings.LastIndex(v, "@"); i >= 0 {
+					if _, err := strconv.ParseInt(v[i+1:], 0, 64); err == nil {
+						v = v[:i]
+					}
+				}
 				if ok && v == string(column.Value) {
 					delete(valMap, k)
 				}
@@ -451,6 +457,8 @@ func TestCsvParseAndWrite(t *testing.T) {
 	rowData := [][]string{
 		{"rk-0", "A", "B"},
 		{"rk-1", "", "C"},
+		{"rk-2", "D@1577862000000000", ""},
+		{"rk-3", "", "E@055000"},
 	}
 
 	byteData, err := transformToCsvBuffer(rowData)

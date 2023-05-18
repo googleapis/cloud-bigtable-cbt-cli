@@ -612,12 +612,16 @@ var commands = []struct {
 			"  Because the first column is reserved for row keys, leave it empty in the header rows.\n" +
 			"  In the column family header, provide each column family once; it applies to the column it is in and every column to the right until another column family is found.\n" +
 			"  Each row after the header rows should contain a row key in the first column, followed by the data cells for the row.\n" +
-			"  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family. \n\n" +
+			"  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family. \n" +
+			"  The timestamp for each cell will default to current time, to explicitly set the timestamp for a cell, use <val>[@<timestamp>] as the value for the cell.\n" +
+			"  If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"  For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
 			"    ,column-family-1,,column-family-2,      // Optional column family row (1st cell empty)\n" +
 			"    ,column-1,column-2,column-3,column-4    // Column qualifiers row (1st cell empty)\n" +
 			"    a,TRUE,,,FALSE                          // Rowkey 'a' followed by data\n" +
 			"    b,,,TRUE,FALSE                          // Rowkey 'b' followed by data\n" +
-			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n\n" +
+			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n" +
+			"    d,TRUE@1577862000000000,,,FALSE		 	// Rowkey 'd' followed by data\n\n" +
 			"  Examples:\n" +
 			"    cbt import csv-import-table data.csv\n" +
 			"    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
@@ -2007,7 +2011,16 @@ func (sr *safeReader) parseAndWrite(ctx context.Context, tbl *bigtable.Table, fa
 			empty := true
 			for i, val := range line {
 				if i > 0 && val != "" {
-					mut.Set(fams[i], cols[i], ts, []byte(val))
+					setts := ts
+					if i := strings.LastIndex(val, "@"); i >= 0 {
+						// Try parsing a timestamp.
+						n, err := strconv.ParseInt(val[i+1:], 0, 64)
+						if err == nil {
+							val = val[:i]
+							setts = bigtable.Timestamp(n)
+						}
+					}
+					mut.Set(fams[i], cols[i], setts, []byte(val))
 					empty = false
 				}
 			}

@@ -419,12 +419,16 @@ Usage:
 	  In the column family header, provide each column family once; it applies to the column it is in and every column to the right until another column family is found.
 	  Each row after the header rows should contain a row key in the first column, followed by the data cells for the row.
 	  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family.
+	  The timestamp for each cell will default to current time, to explicitly set the timestamp for a cell, use <val>[@<timestamp>] as the value for the cell.
+	  If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
+	  For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
 
 	    ,column-family-1,,column-family-2,      // Optional column family row (1st cell empty)
 	    ,column-1,column-2,column-3,column-4    // Column qualifiers row (1st cell empty)
 	    a,TRUE,,,FALSE                          // Rowkey 'a' followed by data
 	    b,,,TRUE,FALSE                          // Rowkey 'b' followed by data
 	    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data
+	    d,TRUE@1577862000000000,,,FALSE		 	// Rowkey 'd' followed by data
 
 	  Examples:
 	    cbt import csv-import-table data.csv

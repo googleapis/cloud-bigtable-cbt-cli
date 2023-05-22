@@ -235,12 +235,12 @@ func TestCsvImporterArgs(t *testing.T) {
 		out importerArgs
 		err string
 	}{
-		{in: []string{"my-table", "my-file.csv"}, out: importerArgs{"", "", 500, 1}},
-		{in: []string{"my-table", "my-file.csv", "app-profile="}, out: importerArgs{"", "", 500, 1}},
+		{in: []string{"my-table", "my-file.csv"}, out: importerArgs{"", "", 500, 1, "now"}},
+		{in: []string{"my-table", "my-file.csv", "app-profile="}, out: importerArgs{"", "", 500, 1, "now"}},
 		{in: []string{"my-table", "my-file.csv", "app-profile=my-ap", "column-family=my-family", "batch-size=100", "workers=20"},
-			out: importerArgs{"my-ap", "my-family", 100, 20}},
+			out: importerArgs{"my-ap", "my-family", 100, 20, "now"}},
 
-		{in: []string{}, err: "usage: cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>]"},
+		{in: []string{}, err: "usage: cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]"},
 		{in: []string{"my-table", "my-file.csv", "column-family="}, err: "column-family cannot be ''"},
 		{in: []string{"my-table", "my-file.csv", "batch-size=-5"}, err: "batch-size must be > 0 and <= 100000"},
 		{in: []string{"my-table", "my-file.csv", "batch-size=5000000"}, err: "batch-size must be > 0 and <= 100000"},
@@ -412,7 +412,7 @@ func setupEmulator(t *testing.T, tables, families []string) (context.Context, *b
 	return ctx, client
 }
 
-func validateData(ctx context.Context, tbl *bigtable.Table, fams, cols []string, rowData [][]string) error {
+func validateData(ctx context.Context, tbl *bigtable.Table, tstype string, fams, cols []string, rowData [][]string) error {
 	// vaildate table entries, valMap["rowkey:family:column"] = mutation value
 	valMap := make(map[string]string)
 	for _, row := range rowData {
@@ -431,9 +431,11 @@ func validateData(ctx context.Context, tbl *bigtable.Table, fams, cols []string,
 			for _, column := range cf {
 				k := data[0] + ":" + string(column.Column)
 				v, ok := valMap[k]
-				if i := strings.LastIndex(v, "@"); i >= 0 {
-					if _, err := strconv.ParseInt(v[i+1:], 0, 64); err == nil {
-						v = v[:i]
+				if tstype == "value-encoded" {
+					if i := strings.LastIndex(v, "@"); i >= 0 {
+						if _, err := strconv.ParseInt(v[i+1:], 0, 64); err == nil {
+							v = v[:i]
+						}
 					}
 				}
 				if ok && v == string(column.Value) {
@@ -457,8 +459,6 @@ func TestCsvParseAndWrite(t *testing.T) {
 	rowData := [][]string{
 		{"rk-0", "A", "B"},
 		{"rk-1", "", "C"},
-		{"rk-2", "D@1577862000000000", ""},
-		{"rk-3", "", "E@055000"},
 	}
 
 	byteData, err := transformToCsvBuffer(rowData)
@@ -468,11 +468,10 @@ func TestCsvParseAndWrite(t *testing.T) {
 	reader := csv.NewReader(bytes.NewReader(byteData))
 
 	sr := safeReader{r: reader}
-	if err = sr.parseAndWrite(ctx, tbl, fams, cols, 1, 1, 1); err != nil {
+	if err = sr.parseAndWrite(ctx, tbl, "now", fams, cols, 1, 1, 1); err != nil {
 		t.Fatalf("parseAndWrite() failed unexpectedly, error:%s", err)
 	}
-
-	if err := validateData(ctx, tbl, fams, cols, rowData); err != nil {
+	if err := validateData(ctx, tbl, "now", fams, cols, rowData); err != nil {
 		t.Fatalf("Read back validation error:%s", err)
 	}
 }
@@ -495,7 +494,7 @@ func TestCsvParseAndWriteBadFamily(t *testing.T) {
 	reader := csv.NewReader(bytes.NewReader(byteData))
 
 	sr := safeReader{r: reader}
-	if err = sr.parseAndWrite(ctx, tbl, fams, cols, 1, 1, 1); err == nil {
+	if err = sr.parseAndWrite(ctx, tbl, "now", fams, cols, 1, 1, 1); err == nil {
 		t.Fatalf("parseAndWrite() should have failed with non-existant column family")
 	}
 }
@@ -519,7 +518,7 @@ func TestCsvParseAndWriteDuplicateRowkeys(t *testing.T) {
 	reader := csv.NewReader(bytes.NewReader(byteData))
 
 	sr := safeReader{r: reader}
-	if err = sr.parseAndWrite(ctx, tbl, fams, cols, 1, 1, 1); err != nil {
+	if err = sr.parseAndWrite(ctx, tbl, "now", fams, cols, 1, 1, 1); err != nil {
 		t.Fatalf("parseAndWrite() should not have failed for duplicate rowkeys: %s", err)
 	}
 
@@ -556,7 +555,7 @@ func TestCsvToCbt(t *testing.T) {
 	}{
 		{
 			label: "has-column-families",
-			ia:    importerArgs{fam: "", sz: 1, workers: 1},
+			ia:    importerArgs{fam: "", sz: 1, workers: 1, timestamp: "now"},
 			csvData: [][]string{
 				{"", "my-family", ""},
 				{"", "col-1", "col-2"},
@@ -570,7 +569,7 @@ func TestCsvToCbt(t *testing.T) {
 		},
 		{
 			label: "no-column-families",
-			ia:    importerArgs{fam: "arg-family", sz: 1, workers: 1},
+			ia:    importerArgs{fam: "arg-family", sz: 1, workers: 1, timestamp: "now"},
 			csvData: [][]string{
 				{"", "col-1", "col-2"},
 				{"rk-0", "A", ""},
@@ -583,7 +582,7 @@ func TestCsvToCbt(t *testing.T) {
 		},
 		{
 			label: "larger-batches",
-			ia:    importerArgs{fam: "arg-family", sz: 100, workers: 1},
+			ia:    importerArgs{fam: "arg-family", sz: 100, workers: 1, timestamp: "now"},
 			csvData: [][]string{
 				{"", "col-1", "col-2"},
 				{"rk-0", "A", ""},
@@ -596,7 +595,7 @@ func TestCsvToCbt(t *testing.T) {
 		},
 		{
 			label: "many-workers",
-			ia:    importerArgs{fam: "arg-family", sz: 1, workers: 20},
+			ia:    importerArgs{fam: "arg-family", sz: 1, workers: 20, timestamp: "now"},
 			csvData: [][]string{
 				{"", "col-1", "col-2"},
 				{"rk-0", "A", ""},
@@ -606,6 +605,34 @@ func TestCsvToCbt(t *testing.T) {
 			},
 			expectedFams: []string{"", "arg-family", "arg-family"},
 			dataStartIdx: 1,
+		},
+		{
+			label: "value-encoded-timestamp",
+			ia:    importerArgs{fam: "", sz: 1, workers: 1, timestamp: "value-encoded"},
+			csvData: [][]string{
+				{"", "my-family", ""},
+				{"", "col-1", "col-2"},
+				{"rk-0", "A@1577862000000000", ""},
+				{"rk-1", "", "B"},
+				{"rk-2", "", ""},
+				{"rk-3", "", "C@1430823905000000"},
+			},
+			expectedFams: []string{"", "my-family", "my-family"},
+			dataStartIdx: 2,
+		},
+		{
+			label: "now-timestamp",
+			ia:    importerArgs{fam: "", sz: 1, workers: 1, timestamp: "now"},
+			csvData: [][]string{
+				{"", "my-family", ""},
+				{"", "col-1", "col-2"},
+				{"rk-0", "A@1577862000000000", ""},
+				{"rk-1", "", "B"},
+				{"rk-2", "", ""},
+				{"rk-3", "", "C@1430823905000000"},
+			},
+			expectedFams: []string{"", "my-family", "my-family"},
+			dataStartIdx: 2,
 		},
 	}
 
@@ -621,7 +648,7 @@ func TestCsvToCbt(t *testing.T) {
 
 		importCSV(ctx, tbl, reader, tc.ia)
 
-		if err := validateData(ctx, tbl, tc.expectedFams, tc.csvData[tc.dataStartIdx-1], tc.csvData[tc.dataStartIdx:]); err != nil {
+		if err := validateData(ctx, tbl, tc.ia.timestamp, tc.expectedFams, tc.csvData[tc.dataStartIdx-1], tc.csvData[tc.dataStartIdx:]); err != nil {
 			t.Fatalf("Read back validation error: %s", err)
 		}
 	}

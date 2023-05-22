@@ -404,11 +404,12 @@ Usage:
 
 Usage:
 
-	cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>]
+	cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]
 	  app-profile=<app-profile-id>          The app profile ID to use for the request
 	  column-family=<family-name>           The column family label to use
 	  batch-size=<500>                      The max number of rows per batch write request
 	  workers=<1>                           The number of worker threads
+	  timestamp=<now|value-encoded>	     	Whether to use current time for all cells or interpret the timestamp from cell value. Defaults to 'now'.
 
 	  Import data from a CSV file into an existing Cloud Bigtable table that already has the column families your data requires.
 
@@ -419,8 +420,9 @@ Usage:
 	  In the column family header, provide each column family once; it applies to the column it is in and every column to the right until another column family is found.
 	  Each row after the header rows should contain a row key in the first column, followed by the data cells for the row.
 	  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family.
-	  The timestamp for each cell will default to current time, to explicitly set the timestamp for a cell, use <val>[@<timestamp>] as the value for the cell.
-	  If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
+
+	  The timestamp for each cell will default to current time (timestamp=now), to explicitly set the timestamp for cells, set timestamp=value-encoded use <val>[@<timestamp>] as the value for the cell.
+	  If no timestamp is delimited for a cell, current time will be used. If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
 	  For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
 
 	    ,column-family-1,,column-family-2,      // Optional column family row (1st cell empty)

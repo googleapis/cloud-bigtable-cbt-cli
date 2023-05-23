@@ -465,7 +465,7 @@ var commands = []struct {
 	},
 	{
 		Name: "createsnapshot",
-		Desc: "Create a backup from a source table",
+		Desc: "Create a backup from a source table (deprecated)",
 		do:   doSnapshotTable,
 		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
 			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
@@ -486,7 +486,7 @@ var commands = []struct {
 	},
 	{
 		Name: "createtablefromsnapshot",
-		Desc: "Create a table from a backup",
+		Desc: "Create a table from a backup (deprecated)",
 		do:   doCreateTableFromSnapshot,
 		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
 			"  table        The name of the table to create\n" +
@@ -554,7 +554,7 @@ var commands = []struct {
 	},
 	{
 		Name:     "deletesnapshot",
-		Desc:     "Delete snapshot in a cluster",
+		Desc:     "Delete snapshot in a cluster (deprecated)",
 		do:       doDeleteSnapshot,
 		Usage:    "cbt deletesnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
@@ -583,7 +583,7 @@ var commands = []struct {
 	},
 	{
 		Name:     "getsnapshot",
-		Desc:     "Get backups info ",
+		Desc:     "Get backups info (deprecated)",
 		do:       doGetSnapshot,
 		Usage:    "cbt getsnapshot <cluster> <backup>",
 		Required: ProjectAndInstanceRequired,
@@ -646,7 +646,7 @@ var commands = []struct {
 	},
 	{
 		Name:     "listsnapshots",
-		Desc:     "List backups in a cluster",
+		Desc:     "List backups in a cluster (deprecated)",
 		do:       doListSnapshots,
 		Usage:    "cbt listsnapshots [<cluster>]",
 		Required: ProjectAndInstanceRequired,
@@ -1585,6 +1585,7 @@ func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {
 
 // NOTE: Previous version of this feature was called "snapshots"
 func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
+	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable instances tables restore --help")
 	if len(args) != 3 {
 		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <backup>")
 	}
@@ -1601,6 +1602,7 @@ func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
 
 // NOTE: Previous version of this feature was called "snapshots"
 func doSnapshotTable(ctx context.Context, args ...string) {
+	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups create --help")
 	if len(args) != 3 && len(args) != 4 {
 		log.Fatal("usage: cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]")
 	}
@@ -1632,6 +1634,7 @@ func doSnapshotTable(ctx context.Context, args ...string) {
 
 // NOTE: Previous version of this feature was called "snapshots"
 func doListSnapshots(ctx context.Context, args ...string) {
+	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups list --help")
 	if len(args) != 0 && len(args) != 1 {
 		log.Fatal("usage: cbt listsnapshots [<cluster>]")
 	}
@@ -1666,6 +1669,7 @@ func doListSnapshots(ctx context.Context, args ...string) {
 
 // NOTE: Previous version of this feature was called "snapshots"
 func doGetSnapshot(ctx context.Context, args ...string) {
+	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups describe --help")
 	if len(args) != 2 {
 		log.Fatalf("usage: cbt getsnapshot <cluster> <backup>")
 	}
@@ -1687,6 +1691,7 @@ func doGetSnapshot(ctx context.Context, args ...string) {
 
 // NOTE: Previous version of this feature was called "snapshots"
 func doDeleteSnapshot(ctx context.Context, args ...string) {
+	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups delete --help")
 	if len(args) != 2 {
 		log.Fatal("usage: cbt deletesnapshot <cluster> <backup>")
 	}

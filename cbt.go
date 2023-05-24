@@ -600,11 +600,12 @@ var commands = []struct {
 		Name: "import",
 		Desc: "Batch write many rows based on the input file",
 		do:   doImport,
-		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>]\n" +
+		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]\n" +
 			"  app-profile=<app-profile-id>          The app profile ID to use for the request\n" +
 			"  column-family=<family-name>           The column family label to use\n" +
 			"  batch-size=<500>                      The max number of rows per batch write request\n" +
-			"  workers=<1>                           The number of worker threads\n\n" +
+			"  workers=<1>                           The number of worker threads\n" +
+			"  timestamp=<now|value-encoded>	     	Whether to use current time for all cells or interpret the timestamp from cell value. Defaults to 'now'.\n\n" +
 			"  Import data from a CSV file into an existing Cloud Bigtable table that already has the column families your data requires.\n\n" +
 			"  The CSV file can support two rows of headers:\n" +
 			"      - (Optional) column families\n" +
@@ -613,11 +614,15 @@ var commands = []struct {
 			"  In the column family header, provide each column family once; it applies to the column it is in and every column to the right until another column family is found.\n" +
 			"  Each row after the header rows should contain a row key in the first column, followed by the data cells for the row.\n" +
 			"  See the example below. If you don't provide a column family header row, the column header is your first row and your import command must include the `column-family` flag to specify an existing column family. \n\n" +
+			"  The timestamp for each cell will default to current time (timestamp=now), to explicitly set the timestamp for cells, set timestamp=value-encoded use <val>[@<timestamp>] as the value for the cell.\n" +
+			"  If no timestamp is delimited for a cell, current time will be used. If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"  For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
 			"    ,column-family-1,,column-family-2,      // Optional column family row (1st cell empty)\n" +
 			"    ,column-1,column-2,column-3,column-4    // Column qualifiers row (1st cell empty)\n" +
 			"    a,TRUE,,,FALSE                          // Rowkey 'a' followed by data\n" +
 			"    b,,,TRUE,FALSE                          // Rowkey 'b' followed by data\n" +
-			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n\n" +
+			"    c,,TRUE,,TRUE                           // Rowkey 'c' followed by data\n" +
+			"    d,TRUE@1577862000000000,,,FALSE		 	// Rowkey 'd' followed by data\n\n" +
 			"  Examples:\n" +
 			"    cbt import csv-import-table data.csv\n" +
 			"    cbt import csv-import-table data-no-families.csv app-profile=batch-write-profile column-family=my-family workers=5\n",
@@ -1868,6 +1873,7 @@ type importerArgs struct {
 	fam        string
 	sz         int
 	workers    int
+	timestamp  string
 }
 
 type safeReader struct {
@@ -1894,12 +1900,13 @@ func doImport(ctx context.Context, args ...string) {
 func parseImporterArgs(ctx context.Context, args []string) (importerArgs, error) {
 	var err error
 	ia := importerArgs{
-		fam:     "",
-		sz:      500,
-		workers: 1,
+		fam:       "",
+		sz:        500,
+		workers:   1,
+		timestamp: "now",
 	}
 	if len(args) < 2 {
-		return ia, fmt.Errorf("usage: cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>]")
+		return ia, fmt.Errorf("usage: cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]")
 	}
 	for _, arg := range args[2:] {
 		switch {
@@ -1920,6 +1927,11 @@ func parseImporterArgs(ctx context.Context, args []string) (importerArgs, error)
 			if err != nil || ia.workers <= 0 {
 				return ia, fmt.Errorf("workers must be > 0, err:%s", err)
 			}
+		case strings.HasPrefix(arg, "timestamp="):
+			ia.timestamp = strings.Split(arg, "=")[1]
+			if ia.timestamp != "now" && ia.timestamp != "value-encoded" {
+				return ia, fmt.Errorf("timestamp must be one of 'now' or 'value-encoded'")
+			}
 		}
 	}
 	return ia, nil
@@ -1938,7 +1950,7 @@ func importCSV(ctx context.Context, tbl *bigtable.Table, r *csv.Reader, ia impor
 	for i := 0; i < ia.workers; i++ {
 		go func(w int) {
 			defer wg.Done()
-			if e := sr.parseAndWrite(ctx, tbl, fams, cols, ts, ia.sz, w); e != nil {
+			if e := sr.parseAndWrite(ctx, tbl, ia.timestamp, fams, cols, ts, ia.sz, w); e != nil {
 				log.Fatalf("error: %s", e)
 			}
 		}(i)
@@ -1994,7 +2006,7 @@ func batchWrite(ctx context.Context, tbl *bigtable.Table, rk []string, muts []*b
 	return len(rk), nil
 }
 
-func (sr *safeReader) parseAndWrite(ctx context.Context, tbl *bigtable.Table, fams, cols []string, ts bigtable.Timestamp, max, worker int) error {
+func (sr *safeReader) parseAndWrite(ctx context.Context, tbl *bigtable.Table, tstype string, fams, cols []string, ts bigtable.Timestamp, max, worker int) error {
 	var rowKey []string
 	var muts []*bigtable.Mutation
 	var c int
@@ -2012,7 +2024,18 @@ func (sr *safeReader) parseAndWrite(ctx context.Context, tbl *bigtable.Table, fa
 			empty := true
 			for i, val := range line {
 				if i > 0 && val != "" {
-					mut.Set(fams[i], cols[i], ts, []byte(val))
+					setts := ts
+					if tstype == "value-encoded" {
+						if i := strings.LastIndex(val, "@"); i >= 0 {
+							// Try parsing a timestamp.
+							n, err := strconv.ParseInt(val[i+1:], 0, 64)
+							if err == nil {
+								val = val[:i]
+								setts = bigtable.Timestamp(n)
+							}
+						}
+					}
+					mut.Set(fams[i], cols[i], setts, []byte(val))
 					empty = false
 				}
 			}

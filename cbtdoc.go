@@ -534,9 +534,12 @@ Usage:
 	    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
 	    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
 
+	    val is a string, and arbitrary bytes can be passed using the $'<byte-data>' bash construct.
+
 	    Examples:
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:connected_cell=1@12345 stats_summary:connected_cell=0@1570041766
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android
+	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:serial_nr_bytes=$'\x00\x01\x02\x03'
 
 # Set the garbage-collection policy (age, versions) for a column family
 

@@ -653,3 +653,70 @@ func TestCsvToCbt(t *testing.T) {
 		}
 	}
 }
+
+func TestDoSetCanHandleMultilineAndByteInput(t *testing.T) {
+	tests := []struct {
+		row                string
+		column             string
+		input              string
+		expected           string
+		expected_timestamp bigtable.Timestamp
+	}{
+		{
+			row:      "row-0",
+			column:   "my-column",
+			input:    "value",
+			expected: "value",
+		},
+		{
+			row:      "row-1",
+			column:   "my-column",
+			input:    "value\nwith\nnewlines",
+			expected: "value\nwith\nnewlines",
+		},
+		{
+			row:      "row-2",
+			column:   "my-column",
+			input:    "value\x00\nwith\x0a\nbytes",
+			expected: "value\x00\nwith\x0a\nbytes",
+		},
+		{
+			row:                "row-3",
+			column:             "my-column",
+			input:              "value with newlines\nand\ntimestamp@10000",
+			expected:           "value with newlines\nand\ntimestamp",
+			expected_timestamp: 10000,
+		},
+		{
+			row:      "row-4",
+			column:   "my-column",
+			input:    "\x01\x02@unparseable_timestamp_should_remain_part_of_val",
+			expected: "\x01\x02@unparseable_timestamp_should_remain_part_of_val",
+		},
+	}
+
+	var ctx context.Context
+	ctx, client = setupEmulator(t, []string{"my-table"}, []string{"my-family"})
+	tbl := client.Open("my-table")
+	for _, tc := range tests {
+		doSet(ctx, "my-table", tc.row, "my-family:"+tc.column+"="+tc.input)
+		row, err := tbl.ReadRow(ctx, tc.row)
+		if err != nil {
+			t.Fatalf("Error %s", err)
+		}
+		if len(row["my-family"]) != 1 {
+			t.Fatalf("Unexpected number of columns. Expected: 1, Was: %d", len(row["my-family"]))
+		}
+		item := row["my-family"][0]
+		if col := "my-family:" + tc.column; col != item.Column {
+			t.Fatalf("Column name does not match. Expected: [%s], Was: [%s]", col, item.Column)
+		}
+		if tc.expected != string(item.Value) {
+			t.Fatalf("Data not found in row. Expected: [%s], Was: [%s]", tc.expected, item.Value)
+		}
+		ts := row["my-family"][0].Timestamp
+		if tc.expected_timestamp != 0 && tc.expected_timestamp != ts {
+			t.Fatalf("Timestamp does not match. Expected: %d, Was: %d", tc.expected_timestamp, ts)
+		}
+	}
+}

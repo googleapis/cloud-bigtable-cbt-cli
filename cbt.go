@@ -734,9 +734,11 @@ var commands = []struct {
 			"    timestamp is an optional integer. \n" +
 			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
 			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
+			"    val is a string, and arbitrary bytes can be passed using the $'<byte-data>' bash construct.\n\n" +
 			"    Examples:\n" +
 			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:connected_cell=1@12345 stats_summary:connected_cell=0@1570041766\n" +
-			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android",
+			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android\n" +
+			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:serial_nr_bytes=$'\\x00\\x01\\x02\\x03'",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1515,7 +1517,7 @@ func doRead(ctx context.Context, args ...string) {
 	}
 }
 
-var setArg = regexp.MustCompile(`([^:]+):([^=]*)=(.*)`)
+var setArg = regexp.MustCompile(`([^:]+):([^=]*)=(?s)(.*)`)
 
 func doSet(ctx context.Context, args ...string) {
 	if len(args) < 3 {

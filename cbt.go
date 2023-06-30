@@ -2163,10 +2163,10 @@ func parseColumnsFilter(columns string) (bigtable.Filter, error) {
 }
 
 func columnFilter(column string) (bigtable.Filter, error) {
-	splitColumn := strings.Split(column, ":")
+	splitColumn := strings.SplitN(column, ":", 2)
 	if len(splitColumn) == 1 {
 		return bigtable.ColumnFilter(splitColumn[0]), nil
-	} else if len(splitColumn) == 2 {
+	} else {
 		if strings.HasSuffix(column, ":") {
 			return bigtable.FamilyFilter(splitColumn[0]), nil
 		} else if strings.HasPrefix(column, ":") {
@@ -2176,8 +2176,6 @@ func columnFilter(column string) (bigtable.Filter, error) {
 			qualifierFilter := bigtable.ColumnFilter(splitColumn[1])
 			return bigtable.ChainFilters(familyFilter, qualifierFilter), nil
 		}
-	} else {
-		return nil, fmt.Errorf("bad format for column %q", column)
 	}
 }
 

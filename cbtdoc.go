@@ -284,7 +284,7 @@ Usage:
 
 Usage:
 
-	cbt createtable <table-id> [families=<family>:gcpolicy=<gcpolicy-expression>,...]
+	cbt createtable <table-id> [families=<family>:<gcpolicy-expression>,...]
 	   [splits=<split-row-key-1>,<split-row-key-2>,...]
 	  families     Column families and their associated garbage collection (gc) policies.
 	               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,

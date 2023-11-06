@@ -475,7 +475,7 @@ var commands = []struct {
 		Name: "createtable",
 		Desc: "Create a table",
 		do:   doCreateTable,
-		Usage: "cbt createtable <table-id> [families=<family>:gcpolicy=<gcpolicy-expression>,...]\n" +
+		Usage: "cbt createtable <table-id> [families=<family>:<gcpolicy-expression>,...]\n" +
 			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n" +
 			"  families     Column families and their associated garbage collection (gc) policies.\n" +
 			"               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,\n" +

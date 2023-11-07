@@ -845,8 +845,7 @@ func doCreateTable(ctx context.Context, args ...string) {
 				famPolicy := strings.Split(family, ":")
 				var gcPolicy bigtable.GCPolicy
 				if len(famPolicy) < 2 {
-					gcPolicy = bigtable.MaxVersionsPolicy(1)
-					log.Printf("Using default GC Policy of %v for family %v", gcPolicy, family)
+					gcPolicy = bigtable.NoGcPolicy()
 				} else {
 					gcPolicy, err = parseGCPolicy(famPolicy[1])
 					if err != nil {

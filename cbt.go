@@ -708,6 +708,7 @@ var commands = []struct {
 			"  end=<row-key>                       Stop reading before this row\n" +
 			"  prefix=<row-key-prefix>             Read rows with this prefix\n" +
 			"  regex=<regex>                       Read rows with keys matching this regex\n" +
+			"  reversed=<true|false>               Read rows in reverse order\n" +
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
 			"  count=<n>                           Read only this many rows\n" +
 			"  cells-per-column=<n>                Read only this many cells per column\n" +
@@ -1409,7 +1410,7 @@ func doRead(ctx context.Context, args ...string) {
 	parsed, err := parseArgs(args[1:], []string{
 		"start", "end", "prefix", "columns", "count",
 		"cells-per-column", "regex", "app-profile", "limit",
-		"format-file", "keys-only", "include-stats",
+		"format-file", "keys-only", "include-stats", "reversed",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -1422,8 +1423,17 @@ func doRead(ctx context.Context, args ...string) {
 		log.Fatal(`"start"/"end" may not be mixed with "prefix"`)
 	}
 
+	reversed := false
+	if reversedStr := parsed["reversed"]; reversedStr != "" {
+		reversed, err = strconv.ParseBool(reversedStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	var rr bigtable.RowRange
 	if start, end := parsed["start"], parsed["end"]; end != "" {
+		// todo do (start, end] if reversed else [start, end)?
 		rr = bigtable.NewRange(start, end)
 	} else if start != "" {
 		rr = bigtable.InfiniteRange(start)
@@ -1439,6 +1449,10 @@ func doRead(ctx context.Context, args ...string) {
 			log.Fatalf("Bad count %q: %v", count, err)
 		}
 		opts = append(opts, bigtable.LimitRows(n))
+	}
+
+	if reversed {
+		// todo add reverse option
 	}
 
 	statsChannel := make(chan *bigtable.FullReadStats, 1)

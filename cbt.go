@@ -1432,11 +1432,11 @@ func doRead(ctx context.Context, args ...string) {
 	}
 
 	var rr bigtable.RowRange
-	if start, end := parsed["start"], parsed["end"]; end != "" {
-		// todo do (start, end] if reversed else [start, end)?
-		rr = bigtable.NewRange(start, end)
-	} else if start != "" {
-		rr = bigtable.InfiniteRange(start)
+	start, end := parsed["start"], parsed["end"]
+	if reversed {
+		rr = bigtable.NewOpenClosedRange(start, end)
+	} else {
+		rr = bigtable.NewClosedOpenRange(start, end)
 	}
 	if prefix := parsed["prefix"]; prefix != "" {
 		rr = bigtable.PrefixRange(prefix)
@@ -1452,7 +1452,7 @@ func doRead(ctx context.Context, args ...string) {
 	}
 
 	if reversed {
-		// todo add reverse option
+		opts = append(opts, bigtable.ReverseScan())
 	}
 
 	statsChannel := make(chan *bigtable.FullReadStats, 1)

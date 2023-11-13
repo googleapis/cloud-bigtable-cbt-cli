@@ -273,7 +273,7 @@ Usage:
 
 	    Example: cbt createinstance my-instance "My instance" my-instance-c1 us-central1-b 3 SSD
 
-# Create a backup from a source table (deprecated)
+Create a backup from a source table (deprecated)
 
 Usage:
 
@@ -293,7 +293,7 @@ Usage:
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
 
-# Create a table from a backup (deprecated)
+Create a table from a backup (deprecated)
 
 Usage:
 
@@ -360,7 +360,7 @@ Usage:
 
 	    Example: cbt deleterow mobile-time-series phone#4c410523#20190501
 
-# Delete snapshot in a cluster (deprecated)
+Delete snapshot in a cluster (deprecated)
 
 Usage:
 
@@ -386,7 +386,7 @@ Usage:
 
 	cbt getappprofile <instance-id> <profile-id>
 
-# Get backups info (deprecated)
+Get backups info (deprecated)
 
 Usage:
 
@@ -454,7 +454,7 @@ Usage:
 
 	cbt listinstances
 
-# List backups in a cluster (deprecated)
+List backups in a cluster (deprecated)
 
 Usage:
 
@@ -506,6 +506,7 @@ Usage:
 	  end=<row-key>                       Stop reading before this row
 	  prefix=<row-key-prefix>             Read rows with this prefix
 	  regex=<regex>                       Read rows with keys matching this regex
+	  reversed=<true|false>               Read rows in reverse order
 	  columns=<family>:<qualifier>,...    Read only these columns, comma-separated
 	  count=<n>                           Read only this many rows
 	  cells-per-column=<n>                Read only this many cells per column

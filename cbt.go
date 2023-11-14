@@ -1423,20 +1423,11 @@ func doRead(ctx context.Context, args ...string) {
 		log.Fatal(`"start"/"end" may not be mixed with "prefix"`)
 	}
 
-	reversed := false
-	if reversedStr := parsed["reversed"]; reversedStr != "" {
-		reversed, err = strconv.ParseBool(reversedStr)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	var rr bigtable.RowRange
-	start, end := parsed["start"], parsed["end"]
-	if reversed {
-		rr = bigtable.NewOpenClosedRange(start, end)
-	} else {
-		rr = bigtable.NewClosedOpenRange(start, end)
+	if start, end := parsed["start"], parsed["end"]; end != "" {
+		rr = bigtable.NewRange(start, end)
+	} else if start != "" {
+		rr = bigtable.InfiniteRange(start)
 	}
 	if prefix := parsed["prefix"]; prefix != "" {
 		rr = bigtable.PrefixRange(prefix)
@@ -1451,8 +1442,14 @@ func doRead(ctx context.Context, args ...string) {
 		opts = append(opts, bigtable.LimitRows(n))
 	}
 
-	if reversed {
-		opts = append(opts, bigtable.ReverseScan())
+	if reversedStr := parsed["reversed"]; reversedStr != "" {
+		reversed, err := strconv.ParseBool(reversedStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if reversed {
+			opts = append(opts, bigtable.ReverseScan())
+		}
 	}
 
 	statsChannel := make(chan *bigtable.FullReadStats, 1)

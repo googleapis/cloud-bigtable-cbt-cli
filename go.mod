@@ -3,7 +3,7 @@ module cloud.google.com/go/cbt
 go 1.19
 
 require (
-	cloud.google.com/go/bigtable v1.18.1
+	cloud.google.com/go/bigtable v1.21.0
 	github.com/google/go-cmp v0.5.9
 	github.com/jhump/protoreflect v1.15.1 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.7.0

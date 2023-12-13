@@ -57,6 +57,7 @@ The commands are:
 	notices                   Display licence information for any third-party dependencies
 	read                      Read rows
 	set                       Set value of a cell (write)
+	addtocell                 Add a value to an aggregate cell (write)
 	setgcpolicy               Set the garbage-collection policy (age, versions) for a column family
 	updateappprofile          Update app profile for an instance
 	updatecluster             Update a cluster in the configured instance
@@ -158,11 +159,12 @@ Usage:
 
 Usage:
 
-	cbt createtable <table-id> [families=<family>:<gcpolicy-expression>,...]
+	cbt createtable <table-id> [families=<family>:<gcpolicy-expression>:<type-expression>,...]
 	   [splits=<split-row-key-1>,<split-row-key-2>,...]
-	  families     Column families and their associated garbage collection (gc) policies.
+	  families     Column families and their associated garbage collection (gc) policies and types.
 	               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,
 	               see "setgcpolicy".
+	               Currently only the type "intsum" is supported.
 	  splits       Row key(s) where the table should initially be split
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
@@ -386,6 +388,22 @@ Usage:
 	    Examples:
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:connected_cell=1@12345 stats_summary:connected_cell=0@1570041766
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android
+
+Add a value to an aggregate cell (write)
+
+Usage:
+
+	cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
+	  app-profile=<app profile id>          The app profile ID to use for the request
+	  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.
+
+	    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.
+	    timestamp is an optional integer.
+	    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
+	    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
+
+	    Examples:
+	      cbt addtocell table1 user1 sum_cf:col1=1@12345
 
 # Set the garbage-collection policy (age, versions) for a column family
 

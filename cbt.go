@@ -474,11 +474,12 @@ var commands = []struct {
 		Name: "createtable",
 		Desc: "Create a table",
 		do:   doCreateTable,
-		Usage: "cbt createtable <table-id> [families=<family>:<gcpolicy-expression>,...]\n" +
+		Usage: "cbt createtable <table-id> [families=<family>:<gcpolicy-expression>:<type-expression>,...]\n" +
 			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n" +
-			"  families     Column families and their associated garbage collection (gc) policies.\n" +
+			"  families     Column families and their associated garbage collection (gc) policies and types.\n" +
 			"               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,\n" +
 			"               see \"setgcpolicy\".\n" +
+			"               Currently only the type \"intsum\" is supported.\n" +
 			"  splits       Row key(s) where the table should initially be split\n\n" +
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
 		Required: ProjectAndInstanceRequired,
@@ -741,6 +742,21 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "addtocell",
+		Desc: "Add a value to an aggregate cell (write)",
+		do:   doAddToCell,
+		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
+			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
+			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
+			"    timestamp is an optional integer. \n" +
+			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
+			"    Examples:\n" +
+			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
@@ -824,9 +840,37 @@ func doCount(ctx context.Context, args ...string) {
 	fmt.Println(n)
 }
 
+func parseFamilyType(s string) (bigtable.Type, error) {
+	if strings.ToLower(s) == "intsum" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.SumAggregator{}}, nil
+	}
+	return nil, fmt.Errorf("unknown type %s", s)
+}
+
+func parseFamilyText(family string) (string, bigtable.Family, error) {
+	famPolicy := strings.Split(family, ":")
+	var gcPolicy bigtable.GCPolicy
+	var tpe bigtable.Type
+	var err error = nil
+	if len(famPolicy) < 2 {
+		gcPolicy = bigtable.NoGcPolicy()
+	} else {
+		gcPolicy, err = parseGCPolicy(famPolicy[1])
+		if err != nil {
+			return "", bigtable.Family{}, err
+		}
+		if len(famPolicy) == 3 {
+			tpe, err = parseFamilyType(famPolicy[2])
+		}
+	}
+	return famPolicy[0], bigtable.Family{GCPolicy: gcPolicy, ValueType: tpe}, nil
+}
+
 func doCreateTable(ctx context.Context, args ...string) {
 	if len(args) < 1 {
-		log.Fatal("usage: cbt createtable <table> [families=family[:gcpolicy],...] [splits=split,...]")
+		log.Fatal("usage: cbt createtable <table> [families=family[:gcpolicy[:type]],...] [splits=split,...]")
 	}
 
 	tblConf := bigtable.TableConf{TableID: args[0]}
@@ -841,19 +885,14 @@ func doCreateTable(ctx context.Context, args ...string) {
 		}
 		switch key {
 		case "families":
-			tblConf.Families = make(map[string]bigtable.GCPolicy)
+			tblConf.ColumnFamilies = make(map[string]bigtable.Family)
 			for _, family := range chunks {
-				famPolicy := strings.Split(family, ":")
-				var gcPolicy bigtable.GCPolicy
-				if len(famPolicy) < 2 {
-					gcPolicy = bigtable.NoGcPolicy()
-				} else {
-					gcPolicy, err = parseGCPolicy(famPolicy[1])
-					if err != nil {
-						log.Fatal(err)
-					}
+				familyId, familyConfig, err := parseFamilyText(family)
+				if err != nil {
+					log.Fatal(err)
 				}
-				tblConf.Families[famPolicy[0]] = gcPolicy
+
+				tblConf.ColumnFamilies[familyId] = familyConfig
 			}
 		case "splits":
 			tblConf.SplitKeys = chunks
@@ -869,7 +908,12 @@ func doCreateFamily(ctx context.Context, args ...string) {
 	if len(args) != 2 {
 		log.Fatal("usage: cbt createfamily <table> <family>")
 	}
-	err := getAdminClient().CreateColumnFamily(ctx, args[0], args[1])
+	familyId, config, err := parseFamilyText(args[1])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = getAdminClient().CreateColumnFamilyWithConfig(ctx, args[0], familyId, config)
 	if err != nil {
 		log.Fatalf("Creating column family: %v", err)
 	}
@@ -1554,6 +1598,46 @@ func doSet(ctx context.Context, args ...string) {
 			}
 		}
 		mut.Set(m[1], m[2], ts, []byte(val))
+	}
+	tbl := getClient(bigtable.ClientConfig{AppProfile: appProfile}).Open(args[0])
+	if err := tbl.Apply(ctx, row, mut); err != nil {
+		log.Fatalf("Applying mutation: %v", err)
+	}
+}
+
+func doAddToCell(ctx context.Context, args ...string) {
+	if len(args) < 3 {
+		log.Fatalf("usage: cbt addtocell <table> <row> [app-profile=<app profile id>] family:[column]=val[@ts] ...")
+	}
+	var appProfile string
+	row := args[1]
+	mut := bigtable.NewMutation()
+	for _, arg := range args[2:] {
+		if strings.HasPrefix(arg, "app-profile=") {
+			appProfile = strings.Split(arg, "=")[1]
+			continue
+		}
+		m := setArg.FindStringSubmatch(arg)
+		if m == nil {
+			log.Fatalf("Bad set arg %q", arg)
+		}
+		val := m[3]
+		ts := bigtable.Now()
+		if i := strings.LastIndex(val, "@"); i >= 0 {
+			// Try parsing a timestamp.
+			n, err := strconv.ParseInt(val[i+1:], 0, 64)
+			if err == nil {
+				val = val[:i]
+				ts = bigtable.Timestamp(n)
+			}
+		}
+
+		if intVal, err := strconv.ParseInt(val, 0, 64); err == nil {
+			mut.AddIntToCell(m[1], m[2], ts, intVal)
+		} else {
+			log.Fatalf("Only int values are supported by addtocell.")
+		}
+
 	}
 	tbl := getClient(bigtable.ClientConfig{AppProfile: appProfile}).Open(args[0])
 	if err := tbl.Apply(ctx, row, mut); err != nil {

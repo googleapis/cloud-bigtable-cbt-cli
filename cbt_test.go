@@ -653,3 +653,37 @@ func TestCsvToCbt(t *testing.T) {
 		}
 	}
 }
+
+func TestParseColumnFamily(t *testing.T) {
+	expectedGc := bigtable.IntersectionPolicy(bigtable.MaxVersionsPolicy(2), bigtable.MaxAgePolicy(time.Hour))
+	expectedType := bigtable.AggregateType{Input: bigtable.Int64Type{}, Aggregator: bigtable.SumAggregator{}}
+
+	var tests = []struct {
+		name   string
+		input  string
+		id     string
+		family bigtable.Family
+	}{
+		{name: "simple", input: "family1", id: "family1", family: bigtable.Family{GCPolicy: bigtable.NoGcPolicy()}},
+		{name: "gc policy only", input: "family1:(((maxversions=2 and (maxage=1h))))",
+			id:     "family1",
+			family: bigtable.Family{GCPolicy: expectedGc}},
+		{name: "type only", input: "family1:never:intsum", id: "family1", family: bigtable.Family{GCPolicy: bigtable.NoGcPolicy(), ValueType: expectedType}},
+		{name: "gc policy and type", input: "family1:(((maxversions=2 and (maxage=1h)))):intsum", id: "family1", family: bigtable.Family{GCPolicy: expectedGc, ValueType: expectedType}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id, family, err := parseFamilyText(tt.input)
+			if err != nil {
+				t.Error(err)
+			}
+			if id != tt.id {
+				t.Errorf("got %s, want %s", id, tt.id)
+			}
+			if !cmp.Equal(family, tt.family, cmp.AllowUnexported(bigtable.IntersectionPolicy(), bigtable.UnionPolicy())) {
+				t.Errorf("got %s, want %s", family, tt.family)
+			}
+
+		})
+	}
+}

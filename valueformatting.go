@@ -242,6 +242,29 @@ func (f *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	}, nil
 }
 
+func (f *valueFormatting) pbJsonFormatter(ctype string) (valueFormatter, error) {
+	md := f.pbMessageTypes[strings.ToLower(ctype)]
+
+	if md == nil {
+		return nil, fmt.Errorf("no Protocol-Buffer message time for: %v", ctype)
+	}
+
+	return func(in []byte) (string, error) {
+		message := dynamic.NewMessage(md)
+		err := message.Unmarshal(in)
+		if err != nil {
+			return "", fmt.Errorf("couldn't deserialize bytes to protobuffer message: %v", err)
+		}
+
+		data, err := message.MarshalJSONIndent()
+		if err != nil {
+			return "", fmt.Errorf("couldn't serialize message to bytes: %v", err)
+		}
+
+		return string(data), nil
+	}, nil
+}
+
 type validEncodings int
 
 const (
@@ -251,24 +274,27 @@ const (
 	protocolBuffer                            // for pretty-print
 	hex                                       // formatting
 	jsonEncoded
+	protocolBufferJson
 )
 
 var validValueFormattingEncodings = map[string]validEncodings{
-	"bigendian":       bigEndian,
-	"b":               bigEndian,
-	"binary":          bigEndian,
-	"hex":             hex,
-	"h":               hex,
-	"j":               jsonEncoded,
-	"json":            jsonEncoded,
-	"littleendian":    littleEndian,
-	"L":               littleEndian,
-	"protocolbuffer":  protocolBuffer,
-	"protocol-buffer": protocolBuffer,
-	"protocol_buffer": protocolBuffer,
-	"proto":           protocolBuffer,
-	"p":               protocolBuffer,
-	"":                none,
+	"bigendian":          bigEndian,
+	"b":                  bigEndian,
+	"binary":             bigEndian,
+	"hex":                hex,
+	"h":                  hex,
+	"j":                  jsonEncoded,
+	"json":               jsonEncoded,
+	"littleendian":       littleEndian,
+	"L":                  littleEndian,
+	"protocolbuffer":     protocolBuffer,
+	"protocol-buffer":    protocolBuffer,
+	"protocol_buffer":    protocolBuffer,
+	"proto":              protocolBuffer,
+	"p":                  protocolBuffer,
+	"protocolbufferjson": protocolBufferJson,
+	"pj":                 protocolBufferJson,
+	"":                   none,
 }
 
 func (f *valueFormatting) validateEncoding(encoding string) (validEncodings, error) {
@@ -497,6 +523,11 @@ func (f *valueFormatting) format(
 				}
 			case jsonEncoded:
 				formatter, err = f.jsonFormatter()
+				if err != nil {
+					return "", err
+				}
+			case protocolBufferJson:
+				formatter, err = f.pbJsonFormatter(ctype)
 				if err != nil {
 					return "", err
 				}

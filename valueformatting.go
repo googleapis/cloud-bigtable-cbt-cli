@@ -27,7 +27,9 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/jhump/protoreflect/dynamic"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"gopkg.in/yaml.v2"
 )
 
@@ -225,15 +227,19 @@ func (f *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	if md == nil {
 		return nil, fmt.Errorf("no Protocol-Buffer message time for: %v", ctype)
 	}
+	protoV2md := md.UnwrapMessage()
 
 	return func(in []byte) (string, error) {
-		message := dynamic.NewMessage(md)
-		err := message.Unmarshal(in)
+		message := dynamicpb.NewMessage(protoV2md)
+		err := proto.Unmarshal(in, message)
 		if err != nil {
 			return "", fmt.Errorf("couldn't deserialize bytes to protobuffer message: %v", err)
 		}
 
-		data, err := message.MarshalTextIndent()
+		data, err := prototext.MarshalOptions{
+			Multiline: true,
+			Indent:    "  ",
+		}.Marshal(message)
 		if err != nil {
 			return "", fmt.Errorf("couldn't serialize message to bytes: %v", err)
 		}

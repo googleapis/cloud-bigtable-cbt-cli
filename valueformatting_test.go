@@ -336,6 +336,30 @@ phones:  {
 			want, got)
 	}
 
+	in, err = ioutil.ReadFile(filepath.Join("testdata", "person_ko.bin"))
+	if err != nil {
+		t.Errorf("Error reading testdata: %v", err)
+	}
+
+	got, err = formatter(in)
+	want = `name:  "민수"
+id:  37
+email:  "minsu@example.com"
+phones:  {
+  number:  "555-1213"
+  type:  WORK
+}
+`
+
+	if err != nil {
+		t.Errorf("Error creating protobuf formatter: %v", err)
+	}
+
+	if got != want {
+		t.Errorf("Protobuf not formatted correctly: wanted %s; got %s",
+			want, got)
+	}
+
 	_, err = formatting.pbFormatter("not a thing")
 	if err == nil {
 		t.Error("Protobuf formatter created with bad input")

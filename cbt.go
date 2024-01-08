@@ -1638,8 +1638,7 @@ func doSnapshotTable(ctx context.Context, args ...string) {
 		}
 	}
 
-	t := time.Now()
-	t.Add(ttl)
+	t := time.Now().Add(ttl)
 
 	err = getAdminClient().CreateBackup(ctx, tableName, clusterName, snapshotName, t)
 	if err != nil {

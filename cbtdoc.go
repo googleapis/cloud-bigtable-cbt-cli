@@ -361,6 +361,7 @@ Usage:
 	  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request
 	  keys-only=<true|false>              Whether to print only row keys
 	  include-stats=full                  Include a summary of request stats at the end of the request
+	  reversed=<false|true>               Read rows in reverse
 
 	    Examples: (see 'set' examples to create data to read)
 	      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10

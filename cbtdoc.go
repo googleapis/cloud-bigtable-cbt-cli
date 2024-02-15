@@ -35,9 +35,7 @@ The commands are:
 	createcluster             Create a cluster in the configured instance
 	createfamily              Create a column family
 	createinstance            Create an instance with an initial cluster
-	createsnapshot            Create a backup from a source table (deprecated)
 	createtable               Create a table
-	createtablefromsnapshot   Create a table from a backup (deprecated)
 	deleteallrows             Delete all rows
 	deleteappprofile          Delete app profile for an instance
 	deletecluster             Delete a cluster from the configured instance
@@ -45,17 +43,14 @@ The commands are:
 	deletefamily              Delete a column family
 	deleteinstance            Delete an instance
 	deleterow                 Delete a row
-	deletesnapshot            Delete snapshot in a cluster (deprecated)
 	deletetable               Delete a table
 	doc                       Print godoc-suitable documentation for cbt
 	getappprofile             Read app profile for an instance
-	getsnapshot               Get backups info (deprecated)
 	help                      Print help text
 	import                    Batch write many rows based on the input file
 	listappprofile            Lists app profile for an instance
 	listclusters              List clusters in an instance
 	listinstances             List instances in a project
-	listsnapshots             List backups in a cluster (deprecated)
 	lookup                    Read from a single row
 	ls                        List tables and column families
 	mddoc                     Print documentation for cbt in Markdown format
@@ -108,120 +103,6 @@ options to your ~/.cbtrc file in the following format:
 
 All values are optional and can be overridden at the command prompt.
 
-## Custom data formatting for the `lookup` and `read` commands.
-
-You can provide custom formatting information for formatting stored
-data values in the `lookup` and `read` commands.
-
-The formatting data follows a formatting model consisting of an
-encoding and type for each column.
-
-The available encodings are:
-
-- `Hex` (alias: `H`)
-
-- `BigEndian` (aliases: `BINARY`, `B`)
-
-- `LittleEndian` (alias: `L`)
-
-- `ProtocolBuffer` (aliases: `Proto`, `P`)
-
-Encoding names and aliases are case insensitive.
-
-The Hex encoding is type agnostic. Data are displayed as a raw
-hexadecimal representation of the stored data.
-
-The available types for the BigEndian and LittleEndian encodings are `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, `float32`, and `float64`.  Stored data length must be a multiple of the
-type sized, in bytes.  Data are displayed as scalars if the stored
-length matches the type size, or as arrays otherwise.  Types names are case
-insensitive.
-
-The types given for the `ProtocolBuffer` encoding
-must case-insensitively match message types defined in provided
-protocol-buffer definition files.  If no type is specified, it
-defaults to the column name for the column data being displayed.
-
-Encoding and type are provided at the column level.  Default encodings
-and types may be provided overall and at the column-family level.  You
-don't need to define column formatting at the family level unless you
-have multiple column families and want to provide family-specific
-defaults or need to specify different formats for columns of the same
-name in different families.
-
-Protocol-buffer definition files may be given, as well as directories
-used to search for definition files and files imported by them. If
-no paths are specified, then the current working directory is used.
-Locations of standard protocol buffer imports (`google/protobuf/*`) need not be specified.
-
-Format information in YAML format is provided using the `format-file` option for the `lookup`
-and `read` commands (e.g `format-file=myformat.yml`).
-
-The YAML file provides an object with optional properties:
-
-`default_encoding`
-: The name of the overall default encoding
-
-`default_type`
-: The name of the overall default type
-
-`protocol_buffer_definitions`
-: A list of protocol-buffer files defining
-: available message types.
-
-`protocol_buffer_paths`
-: A list of directories to search for definition
-: files and imports. If not provided, the current
-: working directory will be used. Locations
-: need not be provided for standard
-: protocol-buffer imports.
-
-`columns`
-: A mapping from column names to column objects.
-
-`families`
-: A mapping from family names to family objects.
-
-Column objects have two properties:
-
-`encoding`
-: The encoding to be used for the column
-: (overriding the default encoding, if any)
-
-`type`
-: The data type to be used for the column
-: (overriding the default type, if any)
-
-Family objects have properties:
-
-`default_encoding`
-: The name of the default encoding for columns in
-: the family
-
-`default_type`
-: The name of the default type for columns in the
-: family
-
-`columns`
-: A mapping from column names to column objects for
-: columns in the family.
-
-Here's an example of a format file:
-```
-
-	default_encoding: ProtocolBuffer
-
-	protocol_buffer_definitions:
-	  - MyProto.proto
-
-	columns:
-	  contact:
-	    type: person
-	  size:
-	    encoding: BigEndian
-	    type: uint32
-
-```
-
 # Count rows in a table
 
 Usage:
@@ -273,13 +154,6 @@ Usage:
 
 	    Example: cbt createinstance my-instance "My instance" my-instance-c1 us-central1-b 3 SSD
 
-Create a backup from a source table (deprecated)
-
-Usage:
-
-	cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]
-	  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")
-
 # Create a table
 
 Usage:
@@ -292,15 +166,6 @@ Usage:
 	  splits       Row key(s) where the table should initially be split
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
-
-Create a table from a backup (deprecated)
-
-Usage:
-
-	cbt createtablefromsnapshot <table> <cluster> <backup>
-	  table        The name of the table to create
-	  cluster      The cluster where the snapshot is located
-	  backup       The snapshot to restore
 
 # Delete all rows
 
@@ -360,12 +225,6 @@ Usage:
 
 	    Example: cbt deleterow mobile-time-series phone#4c410523#20190501
 
-Delete snapshot in a cluster (deprecated)
-
-Usage:
-
-	cbt deletesnapshot <cluster> <backup>
-
 # Delete a table
 
 Usage:
@@ -385,12 +244,6 @@ Usage:
 Usage:
 
 	cbt getappprofile <instance-id> <profile-id>
-
-Get backups info (deprecated)
-
-Usage:
-
-	cbt getsnapshot <cluster> <backup>
 
 # Print help text
 
@@ -454,12 +307,6 @@ Usage:
 
 	cbt listinstances
 
-List backups in a cluster (deprecated)
-
-Usage:
-
-	cbt listsnapshots [<cluster>]
-
 # Read from a single row
 
 Usage:
@@ -519,6 +366,7 @@ Usage:
 	      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10
 	      cbt read mobile-time-series start=phone#4c410523#20190501 end=phone#4c410523#20190601
 	      cbt read mobile-time-series regex="phone.*" cells-per-column=1
+	      cbt read mobile-time-series start=phone#4c410523#20190501 end=phone#4c410523#20190601 reversed=true count=10
 
 	   Note: Using a regex without also specifying start, end, prefix, or count results in a full
 	   table scan, which can be slow.

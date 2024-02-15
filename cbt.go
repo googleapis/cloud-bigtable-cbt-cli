@@ -247,133 +247,133 @@ options to your ~/.cbtrc file in the following format:
 All values are optional and can be overridden at the command prompt.
 `
 
-const formatHelp = `
+// const formatHelp = `
 
-## Custom data formatting for the ` + "`" + `lookup` + "`" +
-	` and ` + "`" + `read` + "`" + ` commands.
+// ## Custom data formatting for the ` + "`" + `lookup` + "`" +
+// 	` and ` + "`" + `read` + "`" + ` commands.
 
-You can provide custom formatting information for formatting stored
-data values in the ` + "`" + `lookup` + "`" + ` and ` + "`" + `read` +
-	"`" + ` commands.
+// You can provide custom formatting information for formatting stored
+// data values in the ` + "`" + `lookup` + "`" + ` and ` + "`" + `read` +
+// 	"`" + ` commands.
 
-The formatting data follows a formatting model consisting of an
-encoding and type for each column.
+// The formatting data follows a formatting model consisting of an
+// encoding and type for each column.
 
-The available encodings are:
+// The available encodings are:
 
-- ` + "`" + `Hex` + "`" + ` (alias: ` + "`" + `H` + "`" + `)
+// - ` + "`" + `Hex` + "`" + ` (alias: ` + "`" + `H` + "`" + `)
 
-- ` + "`" + `BigEndian` + "`" + ` (aliases: ` + "`" + `BINARY` + "`" + `, ` +
-	"`" + `B` + "`" + `)
+// - ` + "`" + `BigEndian` + "`" + ` (aliases: ` + "`" + `BINARY` + "`" + `, ` +
+// 	"`" + `B` + "`" + `)
 
-- ` + "`" + `LittleEndian` + "`" + ` (alias: ` + "`" + `L` + "`" + `)
+// - ` + "`" + `LittleEndian` + "`" + ` (alias: ` + "`" + `L` + "`" + `)
 
-- ` + "`" + `ProtocolBuffer` + "`" + ` (aliases: ` + "`" + `Proto` + "`" + `, ` +
-	"`" + `P` + "`" + `)
+// - ` + "`" + `ProtocolBuffer` + "`" + ` (aliases: ` + "`" + `Proto` + "`" + `, ` +
+// 	"`" + `P` + "`" + `)
 
-Encoding names and aliases are case insensitive.
+// Encoding names and aliases are case insensitive.
 
-The Hex encoding is type agnostic. Data are displayed as a raw
-hexadecimal representation of the stored data.
+// The Hex encoding is type agnostic. Data are displayed as a raw
+// hexadecimal representation of the stored data.
 
-The available types for the BigEndian and LittleEndian encodings are ` +
-	"`" + `int8` + "`" + `, ` + "`" + `int16` + "`" + `, ` + "`" +
-	`int32` + "`" + `, ` + "`" + `int64` + "`" + `, ` + "`" + `uint8` +
-	"`" + `, ` + "`" + `uint16` + "`" + `, ` + "`" + `uint32` + "`" + `, ` +
-	"`" + `uint64` + "`" + `, ` + "`" + `float32` + "`" + `, and ` + "`" +
-	`float64` + "`" + `.  Stored data length must be a multiple of the
-type sized, in bytes.  Data are displayed as scalars if the stored
-length matches the type size, or as arrays otherwise.  Types names are case
-insensitive.
+// The available types for the BigEndian and LittleEndian encodings are ` +
+// 	"`" + `int8` + "`" + `, ` + "`" + `int16` + "`" + `, ` + "`" +
+// 	`int32` + "`" + `, ` + "`" + `int64` + "`" + `, ` + "`" + `uint8` +
+// 	"`" + `, ` + "`" + `uint16` + "`" + `, ` + "`" + `uint32` + "`" + `, ` +
+// 	"`" + `uint64` + "`" + `, ` + "`" + `float32` + "`" + `, and ` + "`" +
+// 	`float64` + "`" + `.  Stored data length must be a multiple of the
+// type sized, in bytes.  Data are displayed as scalars if the stored
+// length matches the type size, or as arrays otherwise.  Types names are case
+// insensitive.
 
-The types given for the ` + "`" + `ProtocolBuffer` + "`" + ` encoding
-must case-insensitively match message types defined in provided
-protocol-buffer definition files.  If no type is specified, it
-defaults to the column name for the column data being displayed.
+// The types given for the ` + "`" + `ProtocolBuffer` + "`" + ` encoding
+// must case-insensitively match message types defined in provided
+// protocol-buffer definition files.  If no type is specified, it
+// defaults to the column name for the column data being displayed.
 
-Encoding and type are provided at the column level.  Default encodings
-and types may be provided overall and at the column-family level.  You
-don't need to define column formatting at the family level unless you
-have multiple column families and want to provide family-specific
-defaults or need to specify different formats for columns of the same
-name in different families.
+// Encoding and type are provided at the column level.  Default encodings
+// and types may be provided overall and at the column-family level.  You
+// don't need to define column formatting at the family level unless you
+// have multiple column families and want to provide family-specific
+// defaults or need to specify different formats for columns of the same
+// name in different families.
 
-Protocol-buffer definition files may be given, as well as directories
-used to search for definition files and files imported by them. If
-no paths are specified, then the current working directory is used.
-Locations of standard protocol buffer imports (` + "`" +
-	`google/protobuf/*` + "`" + `) need not be specified.
+// Protocol-buffer definition files may be given, as well as directories
+// used to search for definition files and files imported by them. If
+// no paths are specified, then the current working directory is used.
+// Locations of standard protocol buffer imports (` + "`" +
+// 	`google/protobuf/*` + "`" + `) need not be specified.
 
-Format information in YAML format is provided using the ` + "`" +
-	`format-file` + "`" + ` option for the ` + "`" + `lookup` + "`" + `
-and ` + "`" + `read` + "`" + ` commands (e.g ` + "`" +
-	`format-file=myformat.yml` + "`" + `).
+// Format information in YAML format is provided using the ` + "`" +
+// 	`format-file` + "`" + ` option for the ` + "`" + `lookup` + "`" + `
+// and ` + "`" + `read` + "`" + ` commands (e.g ` + "`" +
+// 	`format-file=myformat.yml` + "`" + `).
 
-The YAML file provides an object with optional properties:
+// The YAML file provides an object with optional properties:
 
-` + "`" + `default_encoding` + "`" + `
-: The name of the overall default encoding
+// ` + "`" + `default_encoding` + "`" + `
+// : The name of the overall default encoding
 
-` + "`" + `default_type` + "`" + `
-: The name of the overall default type
+// ` + "`" + `default_type` + "`" + `
+// : The name of the overall default type
 
-` + "`" + `protocol_buffer_definitions` + "`" + `
-: A list of protocol-buffer files defining
-: available message types.
+// ` + "`" + `protocol_buffer_definitions` + "`" + `
+// : A list of protocol-buffer files defining
+// : available message types.
 
-` + "`" + `protocol_buffer_paths` + "`" + `
-: A list of directories to search for definition
-: files and imports. If not provided, the current
-: working directory will be used. Locations
-: need not be provided for standard
-: protocol-buffer imports.
+// ` + "`" + `protocol_buffer_paths` + "`" + `
+// : A list of directories to search for definition
+// : files and imports. If not provided, the current
+// : working directory will be used. Locations
+// : need not be provided for standard
+// : protocol-buffer imports.
 
-` + "`" + `columns` + "`" + `
-: A mapping from column names to column objects.
+// ` + "`" + `columns` + "`" + `
+// : A mapping from column names to column objects.
 
-` + "`" + `families` + "`" + `
-: A mapping from family names to family objects.
+// ` + "`" + `families` + "`" + `
+// : A mapping from family names to family objects.
 
-Column objects have two properties:
+// Column objects have two properties:
 
-` + "`" + `encoding` + "`" + `
-: The encoding to be used for the column
-: (overriding the default encoding, if any)
+// ` + "`" + `encoding` + "`" + `
+// : The encoding to be used for the column
+// : (overriding the default encoding, if any)
 
-` + "`" + `type` + "`" + `
-: The data type to be used for the column
-: (overriding the default type, if any)
+// ` + "`" + `type` + "`" + `
+// : The data type to be used for the column
+// : (overriding the default type, if any)
 
-Family objects have properties:
+// Family objects have properties:
 
-` + "`" + `default_encoding` + "`" + `
-: The name of the default encoding for columns in
-: the family
+// ` + "`" + `default_encoding` + "`" + `
+// : The name of the default encoding for columns in
+// : the family
 
-` + "`" + `default_type` + "`" + `
-: The name of the default type for columns in the
-: family
+// ` + "`" + `default_type` + "`" + `
+// : The name of the default type for columns in the
+// : family
 
-` + "`" + `columns` + "`" + `
-: A mapping from column names to column objects for
-: columns in the family.
+// ` + "`" + `columns` + "`" + `
+// : A mapping from column names to column objects for
+// : columns in the family.
 
-Here's an example of a format file:` + "\n```" + `
+// Here's an example of a format file:` + "\n```" + `
 
-  default_encoding: ProtocolBuffer
+//   default_encoding: ProtocolBuffer
 
-  protocol_buffer_definitions:
-    - MyProto.proto
+//   protocol_buffer_definitions:
+//     - MyProto.proto
 
-  columns:
-    contact:
-      type: person
-    size:
-      encoding: BigEndian
-      type: uint32
+//   columns:
+//     contact:
+//       type: person
+//     size:
+//       encoding: BigEndian
+//       type: uint32
 
-` + "```" + `
-`
+// ` + "```" + `
+// `
 
 const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Cloud Bigtable.
 See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
@@ -401,7 +401,6 @@ Example:  cbt -instance=my-instance ls
 Use "cbt help \<command>" for more information about a command.
 
 {{.ConfigHelp}}
-{{.FormatHelp}}
 `
 
 var commands = []struct {
@@ -463,14 +462,14 @@ var commands = []struct {
 			"    Example: cbt createinstance my-instance \"My instance\" my-instance-c1 us-central1-b 3 SSD",
 		Required: ProjectRequired,
 	},
-	{
-		Name: "createsnapshot",
-		Desc: "Create a backup from a source table (deprecated)",
-		do:   doSnapshotTable,
-		Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
-			`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
-		Required: ProjectAndInstanceRequired,
-	},
+	// {
+	// 	Name: "createsnapshot",
+	// 	Desc: "Create a backup from a source table (deprecated)",
+	// 	do:   doSnapshotTable,
+	// 	Usage: "cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]\n" +
+	// 		`  [ttl=<d>]        Lifespan of the backup (e.g. "1h", "4d")`,
+	// 	Required: ProjectAndInstanceRequired,
+	// },
 	{
 		Name: "createtable",
 		Desc: "Create a table",
@@ -484,16 +483,16 @@ var commands = []struct {
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
 		Required: ProjectAndInstanceRequired,
 	},
-	{
-		Name: "createtablefromsnapshot",
-		Desc: "Create a table from a backup (deprecated)",
-		do:   doCreateTableFromSnapshot,
-		Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
-			"  table        The name of the table to create\n" +
-			"  cluster      The cluster where the snapshot is located\n" +
-			"  backup       The snapshot to restore\n",
-		Required: ProjectAndInstanceRequired,
-	},
+	// {
+	// 	Name: "createtablefromsnapshot",
+	// 	Desc: "Create a table from a backup (deprecated)",
+	// 	do:   doCreateTableFromSnapshot,
+	// 	Usage: "cbt createtablefromsnapshot <table> <cluster> <backup>\n" +
+	// 		"  table        The name of the table to create\n" +
+	// 		"  cluster      The cluster where the snapshot is located\n" +
+	// 		"  backup       The snapshot to restore\n",
+	// 	Required: ProjectAndInstanceRequired,
+	// },
 	{
 		Name: "deleteallrows",
 		Desc: "Delete all rows",
@@ -552,13 +551,13 @@ var commands = []struct {
 			"    Example: cbt deleterow mobile-time-series phone#4c410523#20190501",
 		Required: ProjectAndInstanceRequired,
 	},
-	{
-		Name:     "deletesnapshot",
-		Desc:     "Delete snapshot in a cluster (deprecated)",
-		do:       doDeleteSnapshot,
-		Usage:    "cbt deletesnapshot <cluster> <backup>",
-		Required: ProjectAndInstanceRequired,
-	},
+	// {
+	// 	Name:     "deletesnapshot",
+	// 	Desc:     "Delete snapshot in a cluster (deprecated)",
+	// 	do:       doDeleteSnapshot,
+	// 	Usage:    "cbt deletesnapshot <cluster> <backup>",
+	// 	Required: ProjectAndInstanceRequired,
+	// },
 	{
 		Name: "deletetable",
 		Desc: "Delete a table",
@@ -581,13 +580,13 @@ var commands = []struct {
 		Usage:    "cbt getappprofile <instance-id> <profile-id>",
 		Required: ProjectAndInstanceRequired,
 	},
-	{
-		Name:     "getsnapshot",
-		Desc:     "Get backups info (deprecated)",
-		do:       doGetSnapshot,
-		Usage:    "cbt getsnapshot <cluster> <backup>",
-		Required: ProjectAndInstanceRequired,
-	},
+	// {
+	// 	Name:     "getsnapshot",
+	// 	Desc:     "Get backups info (deprecated)",
+	// 	do:       doGetSnapshot,
+	// 	Usage:    "cbt getsnapshot <cluster> <backup>",
+	// 	Required: ProjectAndInstanceRequired,
+	// },
 	{
 		Name: "help",
 		Desc: "Print help text",
@@ -649,13 +648,13 @@ var commands = []struct {
 		Usage:    "cbt listinstances",
 		Required: ProjectRequired,
 	},
-	{
-		Name:     "listsnapshots",
-		Desc:     "List backups in a cluster (deprecated)",
-		do:       doListSnapshots,
-		Usage:    "cbt listsnapshots [<cluster>]",
-		Required: ProjectAndInstanceRequired,
-	},
+	// {
+	// 	Name:     "listsnapshots",
+	// 	Desc:     "List backups in a cluster (deprecated)",
+	// 	do:       doListSnapshots,
+	// 	Usage:    "cbt listsnapshots [<cluster>]",
+	// 	Required: ProjectAndInstanceRequired,
+	// },
 	{
 		Name: "lookup",
 		Desc: "Read from a single row",
@@ -720,7 +719,8 @@ var commands = []struct {
 			"    Examples: (see 'set' examples to create data to read)\n" +
 			"      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10\n" +
 			"      cbt read mobile-time-series start=phone#4c410523#20190501 end=phone#4c410523#20190601\n" +
-			"      cbt read mobile-time-series regex=\"phone.*\" cells-per-column=1\n\n" +
+			"      cbt read mobile-time-series regex=\"phone.*\" cells-per-column=1\n" +
+			"      cbt read mobile-time-series start=phone#4c410523#20190501 end=phone#4c410523#20190601 reversed=true count=10\n\n" +
 			"   Note: Using a regex without also specifying start, end, prefix, or count results in a full\n" +
 			"   table scan, which can be slow.\n",
 		Required: ProjectAndInstanceRequired,
@@ -1085,7 +1085,7 @@ func doDocReal(ctx context.Context, args ...string) {
 		"Commands":   commands,
 		"Flags":      docFlags(),
 		"ConfigHelp": configHelp,
-		"FormatHelp": formatHelp,
+		// "FormatHelp": formatHelp,
 	}
 	var buf bytes.Buffer
 	if err := docTemplate.Execute(&buf, data); err != nil {
@@ -1377,7 +1377,7 @@ func doMDDocReal(ctx context.Context, args ...string) {
 		"Commands":   commands,
 		"Flags":      docFlags(),
 		"ConfigHelp": configHelp,
-		"FormatHelp": formatHelp,
+		// "FormatHelp": formatHelp,
 	}
 	var buf bytes.Buffer
 	if err := mddocTemplate.Execute(&buf, data); err != nil {
@@ -1599,126 +1599,126 @@ func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {
 }
 
 // NOTE: Previous version of this feature was called "snapshots"
-func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
-	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable instances tables restore --help")
-	if len(args) != 3 {
-		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <backup>")
-	}
-	tableName := args[0]
-	clusterName := args[1]
-	backupName := args[2]
+// func doCreateTableFromSnapshot(ctx context.Context, args ...string) {
+// 	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable instances tables restore --help")
+// 	if len(args) != 3 {
+// 		log.Fatal("usage: cbt createtablefromsnapshot <table> <cluster> <backup>")
+// 	}
+// 	tableName := args[0]
+// 	clusterName := args[1]
+// 	backupName := args[2]
 
-	err := getAdminClient().RestoreTableFrom(ctx, config.Instance, tableName, clusterName, backupName)
+// 	err := getAdminClient().RestoreTableFrom(ctx, config.Instance, tableName, clusterName, backupName)
 
-	if err != nil {
-		log.Fatalf("Creating table: %v", err)
-	}
-}
-
-// NOTE: Previous version of this feature was called "snapshots"
-func doSnapshotTable(ctx context.Context, args ...string) {
-	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups create --help")
-	if len(args) != 3 && len(args) != 4 {
-		log.Fatal("usage: cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]")
-	}
-	clusterName := args[0]
-	snapshotName := args[1]
-	tableName := args[2]
-	ttl := bigtable.DefaultSnapshotDuration
-
-	parsed, err := parseArgs(args[3:], []string{"ttl"})
-	if err != nil {
-		log.Fatal(err)
-	}
-	if val, ok := parsed["ttl"]; ok {
-		var err error
-		ttl, err = parseDuration(val)
-		if err != nil {
-			log.Fatalf("Invalid snapshot ttl value %q: %v", val, err)
-		}
-	}
-
-	t := time.Now()
-	t.Add(ttl)
-
-	err = getAdminClient().CreateBackup(ctx, tableName, clusterName, snapshotName, t)
-	if err != nil {
-		log.Fatalf("Failed to create Snapshot: %v", err)
-	}
-}
+// 	if err != nil {
+// 		log.Fatalf("Creating table: %v", err)
+// 	}
+// }
 
 // NOTE: Previous version of this feature was called "snapshots"
-func doListSnapshots(ctx context.Context, args ...string) {
-	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups list --help")
-	if len(args) != 0 && len(args) != 1 {
-		log.Fatal("usage: cbt listsnapshots [<cluster>]")
-	}
+// func doSnapshotTable(ctx context.Context, args ...string) {
+// 	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups create --help")
+// 	if len(args) != 3 && len(args) != 4 {
+// 		log.Fatal("usage: cbt createsnapshot <cluster> <backup> <table> [ttl=<d>]")
+// 	}
+// 	clusterName := args[0]
+// 	snapshotName := args[1]
+// 	tableName := args[2]
+// 	ttl := bigtable.DefaultSnapshotDuration
 
-	var cl string
+// 	parsed, err := parseArgs(args[3:], []string{"ttl"})
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	if val, ok := parsed["ttl"]; ok {
+// 		var err error
+// 		ttl, err = parseDuration(val)
+// 		if err != nil {
+// 			log.Fatalf("Invalid snapshot ttl value %q: %v", val, err)
+// 		}
+// 	}
 
-	if len(args) == 0 {
-		cl = "-"
-	} else {
-		cl = args[0]
-	}
+// 	t := time.Now()
+// 	t.Add(ttl)
 
-	it := getAdminClient().Backups(ctx, cl)
-
-	tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
-	fmt.Fprintf(tw, "Backup\tSource Table\tCreated At\tExpires At\n")
-	fmt.Fprintf(tw, "------\t------------\t----------\t----------\n")
-	tf := "2006-01-02 15:04 MST"
-
-	for {
-		b, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Fatalf("Failed to fetch snapshots %v", err)
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", b.Name, b.SourceTable, b.StartTime.Format(tf), b.ExpireTime.Format(tf))
-	}
-	tw.Flush()
-}
+// 	err = getAdminClient().CreateBackup(ctx, tableName, clusterName, snapshotName, t)
+// 	if err != nil {
+// 		log.Fatalf("Failed to create Snapshot: %v", err)
+// 	}
+// }
 
 // NOTE: Previous version of this feature was called "snapshots"
-func doGetSnapshot(ctx context.Context, args ...string) {
-	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups describe --help")
-	if len(args) != 2 {
-		log.Fatalf("usage: cbt getsnapshot <cluster> <backup>")
-	}
-	c := args[0]
-	bName := args[1]
+// func doListSnapshots(ctx context.Context, args ...string) {
+// 	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups list --help")
+// 	if len(args) != 0 && len(args) != 1 {
+// 		log.Fatal("usage: cbt listsnapshots [<cluster>]")
+// 	}
 
-	b, err := getAdminClient().BackupInfo(ctx, c, bName)
-	if err != nil {
-		log.Fatalf("Failed to get backup: %v", err)
-	}
+// 	var cl string
 
-	tf := "2006-01-02 15:04 MST"
+// 	if len(args) == 0 {
+// 		cl = "-"
+// 	} else {
+// 		cl = args[0]
+// 	}
 
-	fmt.Printf("Name: %s\n", b.Name)
-	fmt.Printf("Source table: %s\n", b.SourceTable)
-	fmt.Printf("Created at: %s\n", b.StartTime.Format(tf))
-	fmt.Printf("Expires at: %s\n", b.ExpireTime.Format(tf))
-}
+// 	it := getAdminClient().Backups(ctx, cl)
+
+// 	tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
+// 	fmt.Fprintf(tw, "Backup\tSource Table\tCreated At\tExpires At\n")
+// 	fmt.Fprintf(tw, "------\t------------\t----------\t----------\n")
+// 	tf := "2006-01-02 15:04 MST"
+
+// 	for {
+// 		b, err := it.Next()
+// 		if err == iterator.Done {
+// 			break
+// 		}
+// 		if err != nil {
+// 			log.Fatalf("Failed to fetch snapshots %v", err)
+// 		}
+// 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", b.Name, b.SourceTable, b.StartTime.Format(tf), b.ExpireTime.Format(tf))
+// 	}
+// 	tw.Flush()
+// }
 
 // NOTE: Previous version of this feature was called "snapshots"
-func doDeleteSnapshot(ctx context.Context, args ...string) {
-	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups delete --help")
-	if len(args) != 2 {
-		log.Fatal("usage: cbt deletesnapshot <cluster> <backup>")
-	}
-	cl := args[0]
-	b := args[1]
+// func doGetSnapshot(ctx context.Context, args ...string) {
+// 	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups describe --help")
+// 	if len(args) != 2 {
+// 		log.Fatalf("usage: cbt getsnapshot <cluster> <backup>")
+// 	}
+// 	c := args[0]
+// 	bName := args[1]
 
-	err := getAdminClient().DeleteBackup(ctx, cl, b)
+// 	b, err := getAdminClient().BackupInfo(ctx, c, bName)
+// 	if err != nil {
+// 		log.Fatalf("Failed to get backup: %v", err)
+// 	}
 
-	if err != nil {
-		log.Fatalf("Failed to delete backup: %v", err)
-	}
-}
+// 	tf := "2006-01-02 15:04 MST"
+
+// 	fmt.Printf("Name: %s\n", b.Name)
+// 	fmt.Printf("Source table: %s\n", b.SourceTable)
+// 	fmt.Printf("Created at: %s\n", b.StartTime.Format(tf))
+// 	fmt.Printf("Expires at: %s\n", b.ExpireTime.Format(tf))
+// }
+
+// NOTE: Previous version of this feature was called "snapshots"
+// func doDeleteSnapshot(ctx context.Context, args ...string) {
+// 	log.Println("Warning: This command is deprecated. Please use gcloud instead. Usage info: gcloud bigtable backups delete --help")
+// 	if len(args) != 2 {
+// 		log.Fatal("usage: cbt deletesnapshot <cluster> <backup>")
+// 	}
+// 	cl := args[0]
+// 	b := args[1]
+
+// 	err := getAdminClient().DeleteBackup(ctx, cl, b)
+
+// 	if err != nil {
+// 		log.Fatalf("Failed to delete backup: %v", err)
+// 	}
+// }
 
 func doCreateAppProfile(ctx context.Context, args ...string) {
 	if len(args) < 4 || len(args) > 6 {

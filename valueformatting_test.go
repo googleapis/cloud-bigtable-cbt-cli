@@ -318,13 +318,38 @@ func TestValueFormattingPBFormatter(t *testing.T) {
 	}
 
 	got, err := formatter(in)
-	want := `name: "Jim"
-id: 42
-email: "jim@example.com"
-phones: <
-  number: "555-1212"
-  type: HOME
->`
+	want := `name:  "Jim"
+id:  42
+email:  "jim@example.com"
+phones:  {
+  number:  "555-1212"
+  type:  HOME
+}
+`
+
+	if err != nil {
+		t.Errorf("Error creating protobuf formatter: %v", err)
+	}
+
+	if got != want {
+		t.Errorf("Protobuf not formatted correctly: wanted %s; got %s",
+			want, got)
+	}
+
+	in, err = ioutil.ReadFile(filepath.Join("testdata", "person_ko.bin"))
+	if err != nil {
+		t.Errorf("Error reading testdata: %v", err)
+	}
+
+	got, err = formatter(in)
+	want = `name:  "민수"
+id:  37
+email:  "minsu@example.com"
+phones:  {
+  number:  "555-1213"
+  type:  WORK
+}
+`
 
 	if err != nil {
 		t.Errorf("Error creating protobuf formatter: %v", err)
@@ -526,13 +551,13 @@ func TestValueFormattingFormat(t *testing.T) {
 
 	in, err := ioutil.ReadFile(filepath.Join("testdata", "person.bin"))
 	want =
-		"      name: \"Jim\"\n" +
-			"      id: 42\n" +
-			"      email: \"jim@example.com\"\n" +
-			"      phones: <\n" +
-			"        number: \"555-1212\"\n" +
-			"        type: HOME\n" +
-			"      >\n"
+		"      name:  \"Jim\"\n" +
+			"      id:  42\n" +
+			"      email:  \"jim@example.com\"\n" +
+			"      phones:  {\n" +
+			"        number:  \"555-1212\"\n" +
+			"        type:  HOME\n" +
+			"      }\n\n"
 
 	if err != nil {
 		t.Errorf("Error when reading testdata: %v", err)
@@ -605,8 +630,8 @@ func TestProtobufferAndYAML(t *testing.T) {
 	want := ("----------------------------------------\n" +
 		"r1\n" +
 		"  f1:cat\n" +
-		"    name: \"Brave\"\n" +
-		"    age: 2")
+		"    name:  \"Brave\"\n" +
+		"    age:  2\n")
 
 	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
 
@@ -690,13 +715,13 @@ func TestPrintRow(t *testing.T) {
 		"  f1:c2\n" +
 		"    258\n" +
 		"  f2:person\n" +
-		"    name: \"Jim\"\n" +
-		"    id: 42\n" +
-		"    email: \"jim@example.com\"\n" +
-		"    phones: <\n" +
-		"      number: \"555-1212\"\n" +
-		"      type: HOME\n" +
-		"    >\n" +
+		"    name:  \"Jim\"\n" +
+		"    id:  42\n" +
+		"    email:  \"jim@example.com\"\n" +
+		"    phones:  {\n" +
+		"      number:  \"555-1212\"\n" +
+		"      type:  HOME\n" +
+		"    }\n\n" +
 		"")
 
 	var out2 bytes.Buffer

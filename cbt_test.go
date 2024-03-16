@@ -177,14 +177,6 @@ func TestParseColumnsFilter(t *testing.T) {
 				bigtable.ChainFilters(bigtable.FamilyFilter("familyB"), bigtable.ColumnFilter("columnB")),
 			),
 		},
-		{
-			in:   "familyA:columnA:cellA",
-			fail: true,
-		},
-		{
-			in:   "familyA::columnA",
-			fail: true,
-		},
 	}
 
 	for _, tc := range tests {

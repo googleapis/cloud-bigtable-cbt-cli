@@ -39,6 +39,7 @@ func TestParseValueFormatSettings(t *testing.T) {
 		DefaultEncoding:           "HEX",
 		ProtocolBufferDefinitions: []string{"MyProto.proto", "MyOtherProto.proto"},
 		ProtocolBufferPaths:       []string{"mycode/stuff", "/home/user/dev/othercode/"},
+		AvroSchemaPaths:           map[string][]string{"namespace.Record": {"file1.avsc", "file2.avsc"}, "namespace.Banana": {"banana.avsc"}},
 		Columns: map[string]valueFormatColumn{
 			"col3": {
 				Encoding: "P",
@@ -47,6 +48,10 @@ func TestParseValueFormatSettings(t *testing.T) {
 			"col4": {
 				Encoding: "P",
 				Type:     "hobby",
+			},
+			"col5": {
+				Encoding: "A",
+				Type:     "namespace.Record",
 			},
 		},
 		Families: map[string]valueFormatFamily{
@@ -587,8 +592,10 @@ func TestJSONAndYAML(t *testing.T) {
 func TestProtobufferAndYAML(t *testing.T) {
 
 	globalValueFormatting = newValueFormatting()
-	globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
-
+	err := globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
+	if err != nil {
+		t.Errorf("Error loading YAML:\n%v", err)
+	}
 	row := bigtable.Row{
 		"f1": {
 			bigtable.ReadItem{
@@ -620,6 +627,48 @@ func TestProtobufferAndYAML(t *testing.T) {
 	}
 }
 
+func TestAvroAndYAML(t *testing.T) {
+
+	globalValueFormatting = newValueFormatting()
+	err := globalValueFormatting.setup(filepath.Join("testdata", "cat.yml"))
+	if err != nil {
+		t.Errorf("Error loading YAML:\n%v", err)
+	}
+
+	row := bigtable.Row{
+		"f1": {
+			bigtable.ReadItem{
+				Row:    "r1",
+				Column: "f1:avro",
+				Value:  []byte{0x0a, 0x42, 0x72, 0x61, 0x76, 0x65, 0x04},
+			},
+		},
+	}
+	var out bytes.Buffer
+
+	printRow(row, &out)
+	got := out.String()
+	want := ("----------------------------------------\n" +
+		"r1\n" +
+		"  f1:avro\n" +
+		"    {\"name\":\"Brave\",\"age\":2}")
+
+	wantAlternative := ("----------------------------------------\n" +
+		"r1\n" +
+		"  f1:avro\n" +
+		"    {\"age\":2,\"name\":\"Brave\"}")
+
+	timestampsRE := regexp.MustCompile("[ ]+@ [^ \t\n]+")
+
+	stripTimestamps := func(s string) string {
+		return string(timestampsRE.ReplaceAll([]byte(s), []byte("")))
+	}
+	got = stripTimestamps(got)
+
+	if !(strings.Contains(got, want) || strings.Contains(got, wantAlternative)) {
+		t.Errorf("Formatting printed incorrectly: wanted\n%s\n,\ngot\n%s", want, got)
+	}
+}
 func TestPrintRow(t *testing.T) {
 	row := bigtable.Row{
 		"f1": {

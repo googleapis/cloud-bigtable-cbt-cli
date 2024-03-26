@@ -21,13 +21,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/linkedin/goavro/v2"
 	"gopkg.in/yaml.v2"
 )
 
@@ -49,10 +52,11 @@ func newValueFormatFamily() valueFormatFamily { // for tests :)
 }
 
 type valueFormatSettings struct {
-	ProtocolBufferDefinitions []string `yaml:"protocol_buffer_definitions"`
-	ProtocolBufferPaths       []string `yaml:"protocol_buffer_paths"`
-	DefaultEncoding           string   `yaml:"default_encoding"`
-	DefaultType               string   `yaml:"default_type"`
+	ProtocolBufferDefinitions []string            `yaml:"protocol_buffer_definitions"`
+	ProtocolBufferPaths       []string            `yaml:"protocol_buffer_paths"`
+	AvroSchemaPaths           map[string][]string `yaml:"avro_schema_paths"`
+	DefaultEncoding           string              `yaml:"default_encoding"`
+	DefaultType               string              `yaml:"default_type"`
 	Columns                   map[string]valueFormatColumn
 	Families                  map[string]valueFormatFamily
 }
@@ -62,6 +66,7 @@ type valueFormatter func([]byte) (string, error)
 type valueFormatting struct {
 	settings       valueFormatSettings
 	pbMessageTypes map[string]*desc.MessageDescriptor
+	avroSchemas    map[string][]*goavro.Codec
 	formatters     map[[2]string]valueFormatter
 }
 
@@ -242,6 +247,30 @@ func (f *valueFormatting) pbFormatter(ctype string) (valueFormatter, error) {
 	}, nil
 }
 
+func (f *valueFormatting) avroFormatter(ctype string) (valueFormatter, error) {
+	schemas := f.avroSchemas[ctype]
+
+	if schemas == nil {
+		return nil, fmt.Errorf("no Avro Schema for: %v", ctype)
+	}
+
+	return func(in []byte) (string, error) {
+		for i, schema := range schemas {
+			native, _, err := schema.NativeFromBinary(in)
+			if err != nil {
+				log.Printf("unable to read data with %d for %v: %v\n", i, ctype, err)
+				continue
+			}
+			b, err := schema.TextualFromNative(nil, native)
+			if err != nil {
+				return "", err
+			}
+			return string(b), nil
+		}
+		return "", fmt.Errorf("unable to read the data for: %v", ctype)
+	}, nil
+}
+
 type validEncodings int
 
 const (
@@ -251,6 +280,7 @@ const (
 	protocolBuffer                            // for pretty-print
 	hex                                       // formatting
 	jsonEncoded
+	avro
 )
 
 var validValueFormattingEncodings = map[string]validEncodings{
@@ -268,6 +298,8 @@ var validValueFormattingEncodings = map[string]validEncodings{
 	"protocol_buffer": protocolBuffer,
 	"proto":           protocolBuffer,
 	"p":               protocolBuffer,
+	"avro":            avro,
+	"a":               avro,
 	"":                none,
 }
 
@@ -365,7 +397,7 @@ func (f *valueFormatting) validateColumns() error {
 }
 
 func (f *valueFormatting) parse(path string) error {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err == nil {
 		err = yaml.UnmarshalStrict([]byte(data), &f.settings)
 	}
@@ -397,6 +429,36 @@ func (f *valueFormatting) setupPBMessages() error {
 	return nil
 }
 
+func (f *valueFormatting) setupAvroSchemas() error {
+	f.avroSchemas = make(map[string][]*goavro.Codec)
+	if len(f.settings.AvroSchemaPaths) > 0 {
+		for name, paths := range f.settings.AvroSchemaPaths {
+			codecs, err := getAvroCodecs(paths)
+			if err != nil {
+				return err
+			}
+			f.avroSchemas[name] = codecs
+		}
+	}
+	return nil
+}
+
+func getAvroCodecs(paths []string) ([]*goavro.Codec, error) {
+	codecs := make([]*goavro.Codec, len(paths))
+	for i, path := range paths {
+		s, err := os.ReadFile(filepath.Clean(path))
+		if err != nil {
+			return nil, fmt.Errorf("cannot read schema: %q %#v", path, err)
+		}
+		codec, err := goavro.NewCodec(string(s))
+		if err != nil {
+			return nil, fmt.Errorf("cannot create avro schema: %q %#v", path, err)
+		}
+		codecs[i] = codec
+	}
+	return codecs, nil
+}
+
 func (f *valueFormatting) setup(formatFilePath string) error {
 	var err error = nil
 
@@ -411,6 +473,11 @@ func (f *valueFormatting) setup(formatFilePath string) error {
 	// call setupPBMessages() and validateColumns() even if
 	// format-file is not specified
 	err = f.setupPBMessages()
+	if err != nil {
+		return err
+	}
+
+	err = f.setupAvroSchemas()
 	if err != nil {
 		return err
 	}
@@ -492,6 +559,11 @@ func (f *valueFormatting) format(
 				formatter, err = f.pbFormatter(ctype)
 				// pbFormatter can return an error if underlying input PB is
 				// bad
+				if err != nil {
+					return "", err
+				}
+			case avro:
+				formatter, err = f.avroFormatter(ctype)
 				if err != nil {
 					return "", err
 				}

@@ -410,6 +410,21 @@ var commands = []struct {
 	Required   RequiredFlags
 }{
 	{
+		Name: "addtocell",
+		Desc: "Add a value to an aggregate cell (write)",
+		do:   doAddToCell,
+		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
+			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
+			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
+			"    timestamp is an optional integer. \n" +
+			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
+			"    Examples:\n" +
+			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "count",
 		Desc:     "Count rows in a table",
 		do:       doCount,
@@ -739,21 +754,6 @@ var commands = []struct {
 			"    Examples:\n" +
 			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:connected_cell=1@12345 stats_summary:connected_cell=0@1570041766\n" +
 			"      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
-		Name: "addtocell",
-		Desc: "Add a value to an aggregate cell (write)",
-		do:   doAddToCell,
-		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
-			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
-			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
-			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
-			"    timestamp is an optional integer. \n" +
-			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
-			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
-			"    Examples:\n" +
-			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
 		Required: ProjectAndInstanceRequired,
 	},
 	{

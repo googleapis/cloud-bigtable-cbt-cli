@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigtable v1.22.0
 	github.com/google/go-cmp v0.6.0
 	github.com/jhump/protoreflect v1.15.6 // Third-party dependency; proceed with caution
-	golang.org/x/oauth2 v0.18.0
+	golang.org/x/oauth2 v0.19.0
 	golang.org/x/sys v0.18.0
 	google.golang.org/api v0.171.0
 	google.golang.org/grpc v1.62.1

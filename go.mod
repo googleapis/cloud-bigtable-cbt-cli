@@ -5,12 +5,12 @@ go 1.19
 require (
 	cloud.google.com/go/bigtable v1.22.0
 	github.com/google/go-cmp v0.6.0
-	github.com/jhump/protoreflect v1.15.6 // Third-party dependency; proceed with caution
+	github.com/jhump/protoreflect v1.16.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/sys v0.18.0
 	google.golang.org/api v0.171.0
 	google.golang.org/grpc v1.62.1
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.33.1-0.20240408130810-98873a205002
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
 )
 
@@ -44,7 +44,7 @@ require (
 )
 
 require (
-	github.com/bufbuild/protocompile v0.9.0 // indirect
+	github.com/bufbuild/protocompile v0.10.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

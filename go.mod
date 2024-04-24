@@ -2,8 +2,6 @@ module cloud.google.com/go/cbt
 
 go 1.21
 
-toolchain go1.22.2
-
 require (
 	cloud.google.com/go/bigtable v1.22.0
 	github.com/google/go-cmp v0.6.0

@@ -701,21 +701,22 @@ var commands = []struct {
 		Name: "read",
 		Desc: "Read rows",
 		do:   doRead,
-		Usage: "cbt read <table-id> [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>]" +
+		Usage: "cbt read <table-id> [authorized-view=<authorized-view-id>] [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>]" +
 			" [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>]" +
 			" [app-profile=<app-profile-id>]\n" +
-			"  start=<row-key>                     Start reading at this row\n" +
-			"  end=<row-key>                       Stop reading before this row\n" +
-			"  prefix=<row-key-prefix>             Read rows with this prefix\n" +
-			"  regex=<regex>                       Read rows with keys matching this regex\n" +
-			"  reversed=<true|false>               Read rows in reverse order\n" +
-			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
-			"  count=<n>                           Read only this many rows\n" +
-			"  cells-per-column=<n>                Read only this many cells per column\n" +
-			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n" +
-			"  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request\n" +
-			"  keys-only=<true|false>              Whether to print only row keys\n" +
-			"  include-stats=full                  Include a summary of request stats at the end of the request\n" +
+			"  authorized-view=<authorized-view-id>  Read from the specified authorized view of the table\n" +
+			"  start=<row-key>                       Start reading at this row\n" +
+			"  end=<row-key>                         Stop reading before this row\n" +
+			"  prefix=<row-key-prefix>               Read rows with this prefix\n" +
+			"  regex=<regex>                         Read rows with keys matching this regex\n" +
+			"  reversed=<true|false>                 Read rows in reverse order\n" +
+			"  columns=<family>:<qualifier>,...      Read only these columns, comma-separated\n" +
+			"  count=<n>                             Read only this many rows\n" +
+			"  cells-per-column=<n>                  Read only this many cells per column\n" +
+			"  app-profile=<app-profile-id>          The app profile ID to use for the request\n" +
+			"  format-file=<path-to-format-file>     The path to a format-configuration file to use for the request\n" +
+			"  keys-only=<true|false>                Whether to print only row keys\n" +
+			"  include-stats=full                    Include a summary of request stats at the end of the request\n" +
 			"\n" +
 			"    Examples: (see 'set' examples to create data to read)\n" +
 			"      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10\n" +
@@ -730,7 +731,8 @@ var commands = []struct {
 		Name: "set",
 		Desc: "Set value of a cell (write)",
 		do:   doSet,
-		Usage: "cbt set <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+		Usage: "cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+			"  authorized-view=<authorized-view-id>  Write to the specified authorized view of the table\n" +
 			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
 			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
 			"    timestamp is an optional integer. \n" +
@@ -1452,7 +1454,7 @@ func doRead(ctx context.Context, args ...string) {
 	}
 
 	parsed, err := parseArgs(args[1:], []string{
-		"start", "end", "prefix", "columns", "count",
+		"authorized-view", "start", "end", "prefix", "columns", "count",
 		"cells-per-column", "regex", "app-profile", "limit",
 		"format-file", "keys-only", "include-stats", "reversed",
 	})
@@ -1548,8 +1550,15 @@ func doRead(ctx context.Context, args ...string) {
 		log.Fatal(err)
 	}
 
+	authorizedView := parsed["authorized-view"]
+	var tbl bigtable.TableAPI
+	if authorizedView != "" {
+		tbl = getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).OpenAuthorizedView(args[0], authorizedView)
+	} else {
+		tbl = getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).OpenTable(args[0])
+	}
+
 	// TODO(dsymonds): Support filters.
-	tbl := getClient(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}).Open(args[0])
 	err = tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
 		var buf bytes.Buffer
 		printRow(r, &buf)
@@ -1573,14 +1582,19 @@ var setArg = regexp.MustCompile(`([^:]+):([^=]*)=(.*)`)
 
 func doSet(ctx context.Context, args ...string) {
 	if len(args) < 3 {
-		log.Fatalf("usage: cbt set <table> <row> [app-profile=<app profile id>] family:[column]=val[@ts] ...")
+		log.Fatalf("usage: cbt set <table> <row> [authorized-view=<authorized-view-id>] [app-profile=<app profile id>] family:[column]=val[@ts] ...")
 	}
 	var appProfile string
+	var authorizedView string
 	row := args[1]
 	mut := bigtable.NewMutation()
 	for _, arg := range args[2:] {
 		if strings.HasPrefix(arg, "app-profile=") {
 			appProfile = strings.Split(arg, "=")[1]
+			continue
+		}
+		if strings.HasPrefix(arg, "authorized-view=") {
+			authorizedView = strings.Split(arg, "=")[1]
 			continue
 		}
 		m := setArg.FindStringSubmatch(arg)
@@ -1599,7 +1613,14 @@ func doSet(ctx context.Context, args ...string) {
 		}
 		mut.Set(m[1], m[2], ts, []byte(val))
 	}
-	tbl := getClient(bigtable.ClientConfig{AppProfile: appProfile}).Open(args[0])
+
+	var tbl bigtable.TableAPI
+	if authorizedView != "" {
+		tbl = getClient(bigtable.ClientConfig{AppProfile: appProfile}).OpenAuthorizedView(args[0], authorizedView)
+	} else {
+		tbl = getClient(bigtable.ClientConfig{AppProfile: appProfile}).OpenTable(args[0])
+	}
+
 	if err := tbl.Apply(ctx, row, mut); err != nil {
 		log.Fatalf("Applying mutation: %v", err)
 	}

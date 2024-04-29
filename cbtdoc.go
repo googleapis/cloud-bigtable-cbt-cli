@@ -350,19 +350,20 @@ Usage:
 
 Usage:
 
-	cbt read <table-id> [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>] [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>] [app-profile=<app-profile-id>]
-	  start=<row-key>                     Start reading at this row
-	  end=<row-key>                       Stop reading before this row
-	  prefix=<row-key-prefix>             Read rows with this prefix
-	  regex=<regex>                       Read rows with keys matching this regex
-	  reversed=<true|false>               Read rows in reverse order
-	  columns=<family>:<qualifier>,...    Read only these columns, comma-separated
-	  count=<n>                           Read only this many rows
-	  cells-per-column=<n>                Read only this many cells per column
-	  app-profile=<app-profile-id>        The app profile ID to use for the request
-	  format-file=<path-to-format-file>   The path to a format-configuration file to use for the request
-	  keys-only=<true|false>              Whether to print only row keys
-	  include-stats=full                  Include a summary of request stats at the end of the request
+	cbt read <table-id> [authorized-view=<authorized-view-id>] [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>] [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>] [app-profile=<app-profile-id>]
+	  authorized-view=<authorized-view-id>  Read from the specified authorized view of the table
+	  start=<row-key>                       Start reading at this row
+	  end=<row-key>                         Stop reading before this row
+	  prefix=<row-key-prefix>               Read rows with this prefix
+	  regex=<regex>                         Read rows with keys matching this regex
+	  reversed=<true|false>                 Read rows in reverse order
+	  columns=<family>:<qualifier>,...      Read only these columns, comma-separated
+	  count=<n>                             Read only this many rows
+	  cells-per-column=<n>                  Read only this many cells per column
+	  app-profile=<app-profile-id>          The app profile ID to use for the request
+	  format-file=<path-to-format-file>     The path to a format-configuration file to use for the request
+	  keys-only=<true|false>                Whether to print only row keys
+	  include-stats=full                    Include a summary of request stats at the end of the request
 
 	    Examples: (see 'set' examples to create data to read)
 	      cbt read mobile-time-series prefix=phone columns=stats_summary:os_build,os_name count=10
@@ -377,7 +378,8 @@ Set value of a cell (write)
 
 Usage:
 
-	cbt set <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
+	cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
+	  authorized-view=<authorized-view-id>  Write to the specified authorized view of the table
 	  app-profile=<app profile id>          The app profile ID to use for the request
 	  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.
 

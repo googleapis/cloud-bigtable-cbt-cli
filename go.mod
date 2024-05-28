@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.16.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sys v0.20.0
-	google.golang.org/api v0.181.0
+	google.golang.org/api v0.182.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution

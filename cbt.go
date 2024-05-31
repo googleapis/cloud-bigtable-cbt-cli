@@ -762,13 +762,14 @@ var commands = []struct {
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
-		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)\n" +
+		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [-force]\n" +
 			"  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d\n" +
 			"  maxversions=<n>    Maximum number of versions to preserve\n" +
+			"  force: Optional flag to override any warnings causing the command to fail\n\n" +
 			"  Put garbage collection policies in quotes when they include shell operators && and ||.\n\n" +
 			"    Examples:\n" +
 			"      cbt setgcpolicy mobile-time-series stats_detail maxage=10d\n" +
-			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1\n",
+			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 -force\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1668,15 +1669,29 @@ func doAddToCell(ctx context.Context, args ...string) {
 
 func doSetGCPolicy(ctx context.Context, args ...string) {
 	if len(args) < 3 {
-		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)")
+		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [-force]")
 	}
 	table := args[0]
 	fam := args[1]
-	pol, err := parseGCPolicy(strings.Join(args[2:], " "))
+	// GC rule can be arbitrarily long, get the last element
+	force := stringInSlice("-force", args[len(args)-1:])
+
+	// If force is not set, policy representation goes until the end of the arg list
+	// otherwise ignore last element
+	lastIdxPolicy := len(args)
+	if force {
+		lastIdxPolicy = len(args) - 1
+	}
+
+	pol, err := parseGCPolicy(strings.Join(args[2:lastIdxPolicy], " "))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := getAdminClient().SetGCPolicy(ctx, table, fam, pol); err != nil {
+	opts := []bigtable.GCPolicyOption{};
+	if force {
+		opts = append(opts, bigtable.IgnoreWarnings())
+	}
+	if err := getAdminClient().SetGCPolicyWithOptions(ctx, table, fam, pol, opts...); err != nil {
 		log.Fatalf("Setting GC policy: %v", err)
 	}
 }

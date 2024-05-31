@@ -3,12 +3,12 @@ module cloud.google.com/go/cbt
 go 1.21
 
 require (
-	cloud.google.com/go/bigtable v1.23.0
+	cloud.google.com/go/bigtable v1.24.0
 	github.com/google/go-cmp v0.6.0
 	github.com/jhump/protoreflect v1.16.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sys v0.20.0
-	google.golang.org/api v0.181.0
+	google.golang.org/api v0.182.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
@@ -39,13 +39,13 @@ require (
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto v0.0.0-20240521202816-d264139d666e // indirect
+	google.golang.org/genproto v0.0.0-20240528184218-531527333157 // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
 
 require (
 	cel.dev/expr v0.15.0 // indirect
-	cloud.google.com/go/auth v0.4.2 // indirect
+	cloud.google.com/go/auth v0.5.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	github.com/bufbuild/protocompile v0.13.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -60,6 +60,6 @@ require (
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240521202816-d264139d666e // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240521202816-d264139d666e // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
 )

@@ -762,10 +762,12 @@ var commands = []struct {
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
-		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [-force]\n" +
+		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n" +
+			"  force: Optional flag to override warnings when relaxing the garbage-colleciton policy on replicated clusters.\n" +
+			"    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks\n" +
+			"    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing\n\n" +
 			"  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d\n" +
 			"  maxversions=<n>    Maximum number of versions to preserve\n" +
-			"  force: Optional flag to override any warnings causing the command to fail\n\n" +
 			"  Put garbage collection policies in quotes when they include shell operators && and ||.\n\n" +
 			"    Examples:\n" +
 			"      cbt setgcpolicy mobile-time-series stats_detail maxage=10d\n" +
@@ -1673,17 +1675,21 @@ func doSetGCPolicy(ctx context.Context, args ...string) {
 	}
 	table := args[0]
 	fam := args[1]
-	// GC rule can be arbitrarily long, get the last element
-	force := stringInSlice("-force", args[len(args)-1:])
 
-	// If force is not set, policy representation goes until the end of the arg list
-	// otherwise ignore last element
-	lastIdxPolicy := len(args)
-	if force {
-		lastIdxPolicy = len(args) - 1
+	// Remaining possible args are `force` and the gc policy itself, which may be
+	// arbitrarily long. Since `force` in the middle of the policy would be invalid
+	// we check only the next and last elements
+	remainingArgs := args[2:]
+	force := false
+	if remainingArgs[0] == "force" {
+		remainingArgs = remainingArgs[1:]
+		force = true
+	} else if (remainingArgs[len(remainingArgs) - 1] == "force") {
+		remainingArgs = remainingArgs[:len(remainingArgs) - 1]
+		force = true
 	}
 
-	pol, err := parseGCPolicy(strings.Join(args[2:lastIdxPolicy], " "))
+	pol, err := parseGCPolicy(strings.Join(remainingArgs, " "))
 	if err != nil {
 		log.Fatal(err)
 	}

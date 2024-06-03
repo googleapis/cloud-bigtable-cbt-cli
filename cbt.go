@@ -762,13 +762,16 @@ var commands = []struct {
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
-		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)\n" +
+		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n" +
+			"  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.\n" +
+			"    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks\n" +
+			"    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing\n\n" +
 			"  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d\n" +
 			"  maxversions=<n>    Maximum number of versions to preserve\n" +
 			"  Put garbage collection policies in quotes when they include shell operators && and ||.\n\n" +
 			"    Examples:\n" +
 			"      cbt setgcpolicy mobile-time-series stats_detail maxage=10d\n" +
-			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1\n",
+			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 force\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1668,15 +1671,33 @@ func doAddToCell(ctx context.Context, args ...string) {
 
 func doSetGCPolicy(ctx context.Context, args ...string) {
 	if len(args) < 3 {
-		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)")
+		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]")
 	}
 	table := args[0]
 	fam := args[1]
-	pol, err := parseGCPolicy(strings.Join(args[2:], " "))
+
+	// Remaining possible args are `force` and the gc policy itself, which may be
+	// arbitrarily long. Since `force` in the middle of the policy would be invalid
+	// we check only the next and last elements
+	remainingArgs := args[2:]
+	force := false
+	if remainingArgs[0] == "force" {
+		remainingArgs = remainingArgs[1:]
+		force = true
+	} else if (remainingArgs[len(remainingArgs) - 1] == "force") {
+		remainingArgs = remainingArgs[:len(remainingArgs) - 1]
+		force = true
+	}
+
+	pol, err := parseGCPolicy(strings.Join(remainingArgs, " "))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := getAdminClient().SetGCPolicy(ctx, table, fam, pol); err != nil {
+	opts := []bigtable.GCPolicyOption{};
+	if force {
+		opts = append(opts, bigtable.IgnoreWarnings())
+	}
+	if err := getAdminClient().SetGCPolicyWithOptions(ctx, table, fam, pol, opts...); err != nil {
 		log.Fatalf("Setting GC policy: %v", err)
 	}
 }

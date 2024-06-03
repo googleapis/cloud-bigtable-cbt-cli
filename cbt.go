@@ -763,7 +763,7 @@ var commands = []struct {
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
 		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n" +
-			"  force: Optional flag to override warnings when relaxing the garbage-colleciton policy on replicated clusters.\n" +
+			"  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.\n" +
 			"    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks\n" +
 			"    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing\n\n" +
 			"  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d\n" +
@@ -771,7 +771,7 @@ var commands = []struct {
 			"  Put garbage collection policies in quotes when they include shell operators && and ||.\n\n" +
 			"    Examples:\n" +
 			"      cbt setgcpolicy mobile-time-series stats_detail maxage=10d\n" +
-			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 -force\n",
+			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 force\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1671,7 +1671,7 @@ func doAddToCell(ctx context.Context, args ...string) {
 
 func doSetGCPolicy(ctx context.Context, args ...string) {
 	if len(args) < 3 {
-		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [-force]")
+		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]")
 	}
 	table := args[0]
 	fam := args[1]

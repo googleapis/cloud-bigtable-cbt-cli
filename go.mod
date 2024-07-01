@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.16.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sys v0.21.0
-	google.golang.org/api v0.186.0
+	google.golang.org/api v0.187.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
@@ -45,7 +45,7 @@ require (
 
 require (
 	cel.dev/expr v0.15.0 // indirect
-	cloud.google.com/go/auth v0.6.0 // indirect
+	cloud.google.com/go/auth v0.6.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	github.com/bufbuild/protocompile v0.14.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

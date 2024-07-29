@@ -479,7 +479,7 @@ var commands = []struct {
 			"  families     Column families and their associated garbage collection (gc) policies and types.\n" +
 			"               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,\n" +
 			"               see \"setgcpolicy\".\n" +
-			"               Currently only the type \"intsum\" is supported.\n" +
+			"               Currently the types \"intsum\", \"intmin\", \"intmax\", and \"inthll\" are supported.\n" +
 			"  splits       Row key(s) where the table should initially be split\n\n" +
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
 		Required: ProjectAndInstanceRequired,
@@ -846,10 +846,23 @@ func doCount(ctx context.Context, args ...string) {
 }
 
 func parseFamilyType(s string) (bigtable.Type, error) {
-	if strings.ToLower(s) == "intsum" {
+	sl := strings.ToLower(s)
+	if sl == "intsum" {
 		return bigtable.AggregateType{
 			Input:      bigtable.Int64Type{},
 			Aggregator: bigtable.SumAggregator{}}, nil
+	} else if sl == "intmin" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.MinAggregator{}}, nil
+	} else if sl == "intmax" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.MaxAggregator{}}, nil
+	} else if sl == "inthll" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.HllppUniqueCountAggregator{}}, nil
 	}
 	return nil, fmt.Errorf("unknown type %s", s)
 }
@@ -1684,8 +1697,8 @@ func doSetGCPolicy(ctx context.Context, args ...string) {
 	if remainingArgs[0] == "force" {
 		remainingArgs = remainingArgs[1:]
 		force = true
-	} else if (remainingArgs[len(remainingArgs) - 1] == "force") {
-		remainingArgs = remainingArgs[:len(remainingArgs) - 1]
+	} else if remainingArgs[len(remainingArgs)-1] == "force" {
+		remainingArgs = remainingArgs[:len(remainingArgs)-1]
 		force = true
 	}
 
@@ -1693,7 +1706,7 @@ func doSetGCPolicy(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	opts := []bigtable.GCPolicyOption{};
+	opts := []bigtable.GCPolicyOption{}
 	if force {
 		opts = append(opts, bigtable.IgnoreWarnings())
 	}

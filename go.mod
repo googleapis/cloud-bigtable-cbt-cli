@@ -3,7 +3,7 @@ module cloud.google.com/go/cbt
 go 1.22
 
 require (
-	cloud.google.com/go/bigtable v1.27.0
+	cloud.google.com/go/bigtable v1.28.0
 	github.com/google/go-cmp v0.6.0
 	github.com/jhump/protoreflect v1.16.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.21.0
@@ -18,10 +18,10 @@ require (
 // updated accordingly.
 require (
 	cloud.google.com/go v0.115.0 // indirect
-	cloud.google.com/go/compute v1.27.2 // indirect
+	cloud.google.com/go/compute v1.27.3 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
-	cloud.google.com/go/iam v1.1.10 // indirect
-	cloud.google.com/go/longrunning v0.5.9 // indirect
+	cloud.google.com/go/iam v1.1.11 // indirect
+	cloud.google.com/go/longrunning v0.5.10 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
@@ -39,7 +39,7 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto v0.0.0-20240722135656-d784300faade // indirect
+	google.golang.org/genproto v0.0.0-20240725223205-93522f1f2a9f // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
 
@@ -47,7 +47,7 @@ require (
 	cel.dev/expr v0.15.0 // indirect
 	cloud.google.com/go/auth v0.7.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.3 // indirect
-	cloud.google.com/go/monitoring v1.20.1 // indirect
+	cloud.google.com/go/monitoring v1.20.2 // indirect
 	github.com/bufbuild/protocompile v0.14.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

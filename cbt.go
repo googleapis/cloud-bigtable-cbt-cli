@@ -881,6 +881,9 @@ func parseFamilyText(family string) (string, bigtable.Family, error) {
 		}
 		if len(famPolicy) == 3 {
 			tpe, err = parseFamilyType(famPolicy[2])
+			if err != nil {
+				return "", bigtable.Family{}, err
+			}
 		}
 	}
 	return famPolicy[0], bigtable.Family{GCPolicy: gcPolicy, ValueType: tpe}, nil

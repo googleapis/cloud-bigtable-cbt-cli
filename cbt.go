@@ -219,8 +219,8 @@ func init() {
 }
 
 const configHelp = `
-Preview features are not currently available to most Cloud Bigtable customers. Alpha
-features might be changed in backward-incompatible ways and are not recommended
+Preview features are not available to most Bigtable customers, they
+might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
 Syntax rules for the Bash shell apply to the ` + "`cbt`" + ` CLI. This means, for example,
@@ -375,7 +375,7 @@ All values are optional and can be overridden at the command prompt.
 // ` + "```" + `
 // `
 
-const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Cloud Bigtable.
+const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Bigtable.
 See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
 Before you use the ` + "`cbt`" + ` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
@@ -410,6 +410,21 @@ var commands = []struct {
 	Required   RequiredFlags
 }{
 	{
+		Name: "addtocell",
+		Desc: "Add a value to an aggregate cell (write)",
+		do:   doAddToCell,
+		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n\n" +
+			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
+			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
+			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
+			"    timestamp is an optional integer. \n" +
+			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
+			"    Examples:\n" +
+			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "count",
 		Desc:     "Count rows in a table",
 		do:       doCount,
@@ -430,9 +445,9 @@ var commands = []struct {
 	},
 	{
 		Name: "createcluster",
-		Desc: "Create a cluster in the configured instance ",
+		Desc: "Create a cluster in the configured instance",
 		do:   doCreateCluster,
-		Usage: "cbt createcluster <cluster-id> <zone> <num-nodes> <storage-type>\n" +
+		Usage: "cbt createcluster <cluster-id> <zone> <num-nodes> <storage-type>\n\n" +
 			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
 			"  zone             The zone in which to create the cluster\n" +
 			"  num-nodes        The number of nodes to create\n" +
@@ -452,7 +467,7 @@ var commands = []struct {
 		Name: "createinstance",
 		Desc: "Create an instance with an initial cluster",
 		do:   doCreateInstance,
-		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n" +
+		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n\n" +
 			"  instance-id      Permanent, unique ID for the instance\n" +
 			"  display-name     Description of the instance\n" +
 			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
@@ -475,11 +490,11 @@ var commands = []struct {
 		Desc: "Create a table",
 		do:   doCreateTable,
 		Usage: "cbt createtable <table-id> [families=<family>:<gcpolicy-expression>:<type-expression>,...]\n" +
-			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n" +
+			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n\n" +
 			"  families     Column families and their associated garbage collection (gc) policies and types.\n" +
 			"               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,\n" +
 			"               see \"setgcpolicy\".\n" +
-			"               Currently the types \"intsum\", \"intmin\", \"intmax\", and \"inthll\" are supported.\n" +
+			"               Types \"intsum\", \"intmin\", \"intmax\", and \"inthll\" are supported.\n" +
 			"  splits       Row key(s) where the table should initially be split\n\n" +
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
 		Required: ProjectAndInstanceRequired,
@@ -512,7 +527,7 @@ var commands = []struct {
 	},
 	{
 		Name: "deletecluster",
-		Desc: "Delete a cluster from the configured instance ",
+		Desc: "Delete a cluster from the configured instance",
 		do:   doDeleteCluster,
 		Usage: "cbt deletecluster <cluster-id>\n\n" +
 			"    Example: cbt deletecluster my-instance-c2",
@@ -522,7 +537,7 @@ var commands = []struct {
 		Name: "deletecolumn",
 		Desc: "Delete all cells in a column",
 		do:   doDeleteColumn,
-		Usage: "cbt deletecolumn <table-id> <row-key> <family> <column> [app-profile=<app-profile-id>]\n" +
+		Usage: "cbt deletecolumn <table-id> <row-key> <family> <column> [app-profile=<app-profile-id>]\n\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n\n" +
 			"    Example: cbt deletecolumn mobile-time-series phone#4c410523#20190501 stats_summary os_name",
 		Required: ProjectAndInstanceRequired,
@@ -547,7 +562,7 @@ var commands = []struct {
 		Name: "deleterow",
 		Desc: "Delete a row",
 		do:   doDeleteRow,
-		Usage: "cbt deleterow <table-id> <row-key> [app-profile=<app-profile-id>]\n" +
+		Usage: "cbt deleterow <table-id> <row-key> [app-profile=<app-profile-id>]\n\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n\n" +
 			"    Example: cbt deleterow mobile-time-series phone#4c410523#20190501",
 		Required: ProjectAndInstanceRequired,
@@ -600,7 +615,7 @@ var commands = []struct {
 		Name: "import",
 		Desc: "Batch write many rows based on the input file",
 		do:   doImport,
-		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]\n" +
+		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]\n\n" +
 			"  app-profile=<app-profile-id>          The app profile ID to use for the request\n" +
 			"  column-family=<family-name>           The column family label to use\n" +
 			"  batch-size=<500>                      The max number of rows per batch write request\n" +
@@ -632,7 +647,7 @@ var commands = []struct {
 		Name:     "listappprofile",
 		Desc:     "Lists app profile for an instance",
 		do:       doListAppProfiles,
-		Usage:    "cbt listappprofile <instance-id> ",
+		Usage:    "cbt listappprofile <instance-id>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -661,7 +676,7 @@ var commands = []struct {
 		Desc: "Read from a single row",
 		do:   doLookup,
 		Usage: "cbt lookup <table-id> <row-key> [columns=<family>:<qualifier>,...] [cells-per-column=<n>]" +
-			" [app-profile=<app profile id>]\n" +
+			" [app-profile=<app profile id>]\n\n" +
 			"  row-key                             String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
 			"  cells-per-column=<n>                Read only this number of cells per column\n" +
@@ -703,7 +718,7 @@ var commands = []struct {
 		do:   doRead,
 		Usage: "cbt read <table-id> [authorized-view=<authorized-view-id>] [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>]" +
 			" [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>]" +
-			" [app-profile=<app-profile-id>]\n" +
+			" [app-profile=<app-profile-id>]\n\n" +
 			"  authorized-view=<authorized-view-id>  Read from the specified authorized view of the table\n" +
 			"  start=<row-key>                       Start reading at this row\n" +
 			"  end=<row-key>                         Stop reading before this row\n" +
@@ -731,7 +746,7 @@ var commands = []struct {
 		Name: "set",
 		Desc: "Set value of a cell (write)",
 		do:   doSet,
-		Usage: "cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+		Usage: "cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n\n" +
 			"  authorized-view=<authorized-view-id>  Write to the specified authorized view of the table\n" +
 			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
 			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
@@ -744,25 +759,10 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "addtocell",
-		Desc: "Add a value to an aggregate cell (write)",
-		do:   doAddToCell,
-		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
-			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
-			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
-			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
-			"    timestamp is an optional integer. \n" +
-			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
-			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
-			"    Examples:\n" +
-			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
-		Required: ProjectAndInstanceRequired,
-	},
-	{
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
-		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n" +
+		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n\n" +
 			"  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.\n" +
 			"    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks\n" +
 			"    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing\n\n" +
@@ -779,7 +779,7 @@ var commands = []struct {
 		Desc: "Update app profile for an instance",
 		do:   doUpdateAppProfile,
 		Usage: "cbt updateappprofile  <instance-id> <profile-id> <description>" +
-			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
+			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n\n" +
 			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
 			"    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 \"Use this one.\" route-any",
 		Required: ProjectAndInstanceRequired,
@@ -788,7 +788,7 @@ var commands = []struct {
 		Name: "updatecluster",
 		Desc: "Update a cluster in the configured instance",
 		do:   doUpdateCluster,
-		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n" +
+		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n\n" +
 			"  cluster-id    Permanent, unique ID for the cluster in the instance\n" +
 			"  num-nodes     The new number of nodes\n\n" +
 			"    Example: cbt updatecluster my-instance-c1 num-nodes=5",

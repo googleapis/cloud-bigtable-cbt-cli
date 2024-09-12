@@ -781,7 +781,6 @@ var commands = []struct {
 		Usage: "cbt setvaluetype <table> <family> <type>\n" +
 			"      type: The type to be updated.\n" +
 			"   Supported type(s):" +
-			"      bytesraw: raw unencoded bytes\n" +
 			"      stringutf8bytes: UTF8 encoded string\n" +
 			"   Updating to or from aggregate types is currently unsupported.\n" +
 			"   Example:\n" +
@@ -880,10 +879,6 @@ func parseFamilyType(s string) (bigtable.Type, error) {
 	} else if sl == "stringutf8bytes" {
 		return bigtable.StringType{
 			Encoding: bigtable.StringUtf8Encoding{},
-		}, nil
-	} else if sl == "bytesraw" {
-		return bigtable.BytesType{
-			Encoding: bigtable.RawBytesEncoding{},
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown type %s", s)

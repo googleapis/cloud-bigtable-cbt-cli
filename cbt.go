@@ -775,6 +775,19 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "setvaluetype",
+		Desc: "Update column family's value type.",
+		do:   doSetFamilyValueType,
+		Usage: "cbt setvaluetype <table> <family> <type>\n" +
+			"      type: The type to be updated.\n" +
+			"   Supported type(s):" +
+			"      stringutf8bytes: UTF8 encoded string\n" +
+			"   Updating to or from aggregate types is currently unsupported.\n" +
+			"   Example:\n" +
+			"       cbt setvaluetype mobile-time-series vendor-info stringutf8bytes",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "updateappprofile",
 		Desc: "Update app profile for an instance",
 		do:   doUpdateAppProfile,
@@ -863,6 +876,10 @@ func parseFamilyType(s string) (bigtable.Type, error) {
 		return bigtable.AggregateType{
 			Input:      bigtable.Int64Type{},
 			Aggregator: bigtable.HllppUniqueCountAggregator{}}, nil
+	} else if sl == "stringutf8bytes" {
+		return bigtable.StringType{
+			Encoding: bigtable.StringUtf8Encoding{},
+		}, nil
 	}
 	return nil, fmt.Errorf("unknown type %s", s)
 }
@@ -887,6 +904,24 @@ func parseFamilyText(family string) (string, bigtable.Family, error) {
 		}
 	}
 	return famPolicy[0], bigtable.Family{GCPolicy: gcPolicy, ValueType: tpe}, nil
+}
+
+func doSetFamilyValueType(ctx context.Context, args ...string) {
+	if len(args) < 3 {
+		log.Fatal("usage: cbt setvaluetype <table> <family> <type>")
+	}
+	familyType, err := parseFamilyType(args[2])
+	if err != nil {
+		log.Fatalf("Failed to update family value type: %v", err)
+	}
+
+	err = getAdminClient().UpdateFamily(ctx, args[0] /*table*/, args[1], /*familyName*/
+		bigtable.Family{
+			ValueType: familyType,
+		})
+	if err != nil {
+		log.Fatalf("Set value type: %v", err)
+	}
 }
 
 func doCreateTable(ctx context.Context, args ...string) {
@@ -1428,10 +1463,14 @@ func doLS(ctx context.Context, args ...string) {
 		}
 		sort.Sort(byFamilyName(ti.FamilyInfos))
 		tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
-		fmt.Fprintf(tw, "Family Name\tGC Policy\n")
-		fmt.Fprintf(tw, "-----------\t---------\n")
+		fmt.Fprintf(tw, "Family Name\tGC Policy\tValue Type\n")
+		fmt.Fprintf(tw, "-----------\t---------\t----------\n")
 		for _, fam := range ti.FamilyInfos {
-			fmt.Fprintf(tw, "%s\t%s\n", fam.Name, fam.GCPolicy)
+			jsonString, err := bigtable.MarshalJSON(fam.ValueType)
+			if err != nil {
+				log.Fatalf("Getting table info: %v", err)
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", fam.Name, fam.GCPolicy, jsonString)
 		}
 		tw.Flush()
 	}

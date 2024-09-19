@@ -9,7 +9,7 @@ require (
 	golang.org/x/oauth2 v0.22.0
 	golang.org/x/sys v0.24.0
 	google.golang.org/api v0.196.0
-	google.golang.org/grpc v1.66.0
+	google.golang.org/grpc v1.66.2
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
 )

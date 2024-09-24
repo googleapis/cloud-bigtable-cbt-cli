@@ -3,7 +3,7 @@ module cloud.google.com/go/cbt
 go 1.21
 
 require (
-	cloud.google.com/go/bigtable v1.32.0
+	cloud.google.com/go/bigtable v1.33.0
 	github.com/google/go-cmp v0.6.0
 	github.com/jhump/protoreflect v1.17.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.23.0
@@ -19,8 +19,8 @@ require (
 require (
 	cloud.google.com/go v0.115.1 // indirect
 	cloud.google.com/go/compute/metadata v0.5.1 // indirect
-	cloud.google.com/go/iam v1.2.0 // indirect
-	cloud.google.com/go/longrunning v0.6.0 // indirect
+	cloud.google.com/go/iam v1.2.1 // indirect
+	cloud.google.com/go/longrunning v0.6.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20240822171458-6449f94b4d59 // indirect
@@ -43,7 +43,7 @@ require (
 	cel.dev/expr v0.16.0 // indirect
 	cloud.google.com/go/auth v0.9.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
-	cloud.google.com/go/monitoring v1.21.0 // indirect
+	cloud.google.com/go/monitoring v1.21.1 // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

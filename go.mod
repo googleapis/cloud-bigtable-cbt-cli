@@ -10,7 +10,7 @@ require (
 	golang.org/x/sys v0.25.0
 	google.golang.org/api v0.198.0
 	google.golang.org/grpc v1.66.2
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
 )
 

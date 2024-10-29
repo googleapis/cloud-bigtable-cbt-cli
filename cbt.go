@@ -1415,7 +1415,7 @@ func printRow(r bigtable.Row, w io.Writer) {
 		ris := r[fam]
 		sort.Sort(byColumn(ris))
 		for _, ri := range ris {
-			ts := time.Unix(0, int64(ri.Timestamp)*1e3)
+			ts := time.UnixMicro(int64(ri.Timestamp))
 			fmt.Fprintf(w, "  %-40s @ %s\n",
 				ri.Column,
 				ts.Format("2006/01/02-15:04:05.000000"))

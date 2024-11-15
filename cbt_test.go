@@ -476,6 +476,32 @@ func TestCsvParseAndWrite(t *testing.T) {
 	}
 }
 
+func TestPrintRowWithHighTimestamp(t *testing.T) {
+	ctx, client := setupEmulator(t, []string{"my-table"}, []string{"my-family"})
+	tbl := client.Open("my-table")
+	mut := bigtable.NewMutation()
+
+	loc, err := time.LoadLocation("US/Pacific")
+	if (err != nil) {
+		t.Fatalf("Failed to load timezone: %v", err)
+	}
+
+	// a timestamp that is just over int64 max in nanoseconds
+	mut.Set("my-family", "foo", 9223372036855000, []byte("bar"))
+	err = tbl.Apply(ctx, "my-key", mut)
+	if (err != nil) {
+		t.Fatalf("Could not write some rows to prepare the test.")
+	}
+	row, err := tbl.ReadRow(ctx, "my-key")
+	var sb strings.Builder
+	printRowAtTimezone(row, &sb, loc)
+
+	expected := "@ 2262/04/11-16:47:16.855000"
+	if !strings.Contains(sb.String(), expected) {
+		t.Fatalf("Could not find correct timestamp string in printRow result.\nExpected a string containing: %s\nGot: %s", expected, sb.String())
+	}
+}
+
 func TestCsvParseAndWriteBadFamily(t *testing.T) {
 	ctx, client := setupEmulator(t, []string{"my-table"}, []string{"my-family"})
 

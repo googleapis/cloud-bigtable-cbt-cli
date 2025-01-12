@@ -178,12 +178,12 @@ func TestParseColumnsFilter(t *testing.T) {
 			),
 		},
 		{
-			in:   "familyA:columnA:cellA",
-			fail: true,
+			in:  "familyA:columnA:text",
+			out: bigtable.ChainFilters(bigtable.FamilyFilter("familyA"), bigtable.ColumnFilter("columnA:text")),
 		},
 		{
-			in:   "familyA::columnA",
-			fail: true,
+			in:  "familyA::columnA",
+			out: bigtable.ChainFilters(bigtable.FamilyFilter("familyA"), bigtable.ColumnFilter(":columnA")),
 		},
 	}
 

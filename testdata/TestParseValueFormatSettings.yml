@@ -25,6 +25,13 @@ protocol_buffer_paths:
   - mycode/stuff
   - /home/user/dev/othercode/
 
+avro_schema_paths:
+  namespace.Record:
+    - file1.avsc
+    - file2.avsc
+  namespace.Banana: 
+    - banana.avsc
+
 families:
   family1:
     default_encoding: BigEndian
@@ -59,3 +66,6 @@ columns:
   col4:
     encoding: P
     type: hobby
+  col5:
+    encoding: A
+    type: namespace.Record

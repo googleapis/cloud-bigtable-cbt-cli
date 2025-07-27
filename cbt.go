@@ -765,6 +765,22 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "readmodifywrite",
+		Desc: "Update a cell with incremental operations based on the latest value of the cell",
+		do:   doReadModifyWrite,
+		Usage: "cbt readmodifywrite <table-id> <rowkey> <family> <qualifier> [append=<val>] [increment=<delta>]\n\n" +
+			"  row-key                                String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
+			"  family                                 Column family\n" +
+			"  qualifier                              Column qualifier\n" +
+			"  append=<val>                           Append the given value to the cell\n" +
+			"    If the cell is unset, it will be treated as an empty value.\n" +
+			"  increment=<delta>                      Increment the cell by the given integer delta\n" +
+			"    If the cell is unset, it will be treated as zero. If the cell is set and is not an 8-byte value, the operation will fail.\n\n" +
+			"  Examples:\n" +
+			"    cbt readmodifywrite mobile-time-series phone#4c410523#20190501 stats_summary boot_count increment=1\n",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
@@ -1708,6 +1724,42 @@ func doSet(ctx context.Context, args ...string) {
 	if err := tbl.Apply(ctx, row, mut); err != nil {
 		log.Fatalf("Applying mutation: %v", err)
 	}
+}
+
+func doReadModifyWrite(ctx context.Context, args ...string) {
+	if len(args) < 5 {
+		log.Fatalf("cbt readmodifywrite <table-id> <rowkey> <family> <qualifier> [append=<val>] [increment=<delta>]")
+	}
+	table := args[0]
+	rowkey := args[1]
+	family := args[2]
+	qualifier := args[3]
+
+	parsed, err := parseArgs(args[4:], []string{"append", "increment"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mut := bigtable.NewReadModifyWrite()
+	if arg, ok := parsed["append"]; ok {
+		mut.AppendValue(family, qualifier, []byte(arg))
+	} else if arg, ok := parsed["increment"]; ok {
+		delta, err := strconv.ParseInt(arg, 0, 64)
+		if err != nil {
+			log.Fatalf("While parsing increment=...: %v", err)
+		}
+		mut.Increment(family, qualifier, delta)
+	}
+
+	tbl := getClient(bigtable.ClientConfig{}).OpenTable(table)
+	r, err := tbl.ApplyReadModifyWrite(ctx, rowkey, mut)
+	if err != nil {
+		log.Fatalf("Applying read modify write: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printRow(r, &buf)
+	fmt.Println(buf.String())
 }
 
 func doAddToCell(ctx context.Context, args ...string) {

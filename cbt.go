@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/base64"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -29,6 +30,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -39,6 +41,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	"cloud.google.com/go/civil"
+	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
+	"golang.org/x/term"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -819,6 +825,15 @@ var commands = []struct {
 		Desc:     "Block until all the completed writes have been replicated to all the clusters",
 		do:       doWaitForReplicaiton,
 		Usage:    "cbt waitforreplication <table-id>\n",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name:     "sql",
+		Desc:     "Execute a SQL query on an Instance",
+		do:       doSql,
+		Usage:    "cbt sql <QUERY>\n\n" +
+		  "See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
+		  "Note that this does not support parameterized queries.\n",
 		Required: ProjectAndInstanceRequired,
 	},
 }
@@ -1771,6 +1786,191 @@ func doWaitForReplicaiton(ctx context.Context, args ...string) {
 	if err := getAdminClient().WaitForReplication(ctx, table); err != nil {
 		log.Fatalf("Waiting for replication: %v", err)
 	}
+}
+
+// Converts a string with non UTF-8 characters into a UTF-8 string.
+func utf8(s string) string {
+	return strings.ToValidUTF8(s, "�")
+}
+
+// formatDecodedValue recursively formats a SQLType value into a human-readable string.
+func formatDecodedValue(t bigtable.SQLType, v reflect.Value) (string, error) {
+	// Handle structs first, they are a bit special.
+	if st, ok := t.(bigtable.StructSQLType); ok {
+		s, ok := v.Interface().(bigtable.Struct)
+		if !ok {
+			return "", fmt.Errorf("struct is not aligned with type")
+		}
+
+		// Format them as a map.
+		formattedMap := make(map[string]string)
+		for i, f := range st.Fields {
+			st := sqlTypeToReflectType(f.Type)
+			valT := reflect.New(st).Interface()
+			if err := s.GetByIndex(i, valT); err != nil {
+				return "", err
+			}
+
+			fv, err := formatDecodedValue(f.Type, reflect.ValueOf(valT).Elem())
+			if err != nil {
+				return "", err
+			}
+			formattedMap[utf8(f.Name)] = fv
+		}
+		return fmt.Sprintf("%v", formattedMap), nil
+	}
+
+	switch v.Kind() {
+	case reflect.Slice:
+		// Slices of bytes should become UTF-8 strings.
+		if v.Type() == reflect.TypeOf([]byte{}) {
+			return utf8(string(v.Interface().([]byte))), nil
+		}
+
+		// Otherwise these should be Array SQLTypes
+		formattedSlice := make([]string, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			fv, err := formatDecodedValue(t.(bigtable.ArraySQLType).ElemType, v.Index(i))
+			if err != nil {
+				return "", err
+			}
+			formattedSlice[i] = fv
+		}
+		return fmt.Sprintf("%v", formattedSlice), nil
+
+	case reflect.Map:
+		formattedMap := make(map[string]string)
+		iter := v.MapRange()
+		for iter.Next() {
+			var err error
+			var k []byte
+			if iter.Key().Type().Kind() == reflect.String {
+				// Keys are base64 encoded, so extract them. If we can't fallback to showing base64.
+				k, err = base64.StdEncoding.DecodeString(iter.Key().Interface().(string))
+				if err != nil {
+					k = []byte(iter.Key().Interface().(string))
+				}
+			} else if iter.Key().Type() == reflect.TypeOf([]byte{}) {
+				// Same as the above, but treat a byte array as a string for maps.
+				var n int
+				n, err = base64.StdEncoding.Decode(k, iter.Key().Interface().([]byte))
+				if n != len(iter.Key().Interface().([]byte)) || err != nil {
+					k = iter.Key().Interface().([]byte)
+				}
+			} else {
+				// Otherwise format the key according to its type.
+				fv, err := formatDecodedValue(t.(bigtable.MapSQLType).KeyType, iter.Key())
+				if err != nil {
+					return "", err
+				}
+				k = []byte(fv)
+			}
+			fv, err := formatDecodedValue(t.(bigtable.MapSQLType).ValueType, iter.Value())
+			if err != nil {
+				return "", err
+			}
+			formattedMap[utf8(string(k))] = fv
+		}
+		return fmt.Sprintf("%v", formattedMap), nil
+
+	default:
+		// Rely on golang's default value printing for everything else.
+		return utf8(fmt.Sprintf("%v", v.Interface())), nil
+	}
+}
+
+// sqlTypeToReflectType translates Bigtable SQL type metadata to a Go reflect.Type using recursion.
+func sqlTypeToReflectType(t bigtable.SQLType) reflect.Type {
+	switch t.(type) {
+	case bigtable.StringSQLType:
+		return reflect.TypeOf("")
+	case bigtable.BytesSQLType:
+		return reflect.TypeOf([]byte{})
+	case bigtable.Int64SQLType:
+		return reflect.TypeOf(int64(0))
+	case bigtable.Float32SQLType:
+		return reflect.TypeOf(float32(0))
+	case bigtable.Float64SQLType:
+		return reflect.TypeOf(float64(0))
+	case bigtable.BoolSQLType:
+		return reflect.TypeOf(false)
+	case bigtable.TimestampSQLType:
+		return reflect.TypeOf(time.Time{})
+	case bigtable.DateSQLType:
+		return reflect.TypeOf(civil.Date{})
+	case bigtable.StructSQLType:
+		return reflect.TypeOf(bigtable.Struct{})
+	case bigtable.MapSQLType:
+		k := sqlTypeToReflectType(t.(bigtable.MapSQLType).KeyType)
+		if reflect.TypeOf(t.(bigtable.MapSQLType).KeyType) == reflect.TypeOf(bigtable.BytesSQLType{}) {
+			k = sqlTypeToReflectType(bigtable.StringSQLType{})
+		}
+		v := sqlTypeToReflectType(t.(bigtable.MapSQLType).ValueType)
+		return reflect.MapOf(k, v)
+	case bigtable.ArraySQLType:
+		v := sqlTypeToReflectType(t.(bigtable.ArraySQLType).ElemType)
+		return reflect.SliceOf(v)
+	}
+	return reflect.TypeOf(new(interface{})).Elem()
+}
+
+// getFormattedValue decodes a value from a ResultRow and formats it for display.
+func getFormattedValue(row bigtable.ResultRow, index int) (string, error) {
+	// Get a pointer to the value in the row.
+	t := sqlTypeToReflectType(row.Metadata.Columns[index].SQLType)
+	valT := reflect.New(t).Interface()
+	if err := row.GetByIndex(index, valT); err != nil {
+		return "", err
+	}
+	return formatDecodedValue(row.Metadata.Columns[index].SQLType, reflect.ValueOf(valT).Elem())
+}
+
+func doSql(ctx context.Context, args ...string) {
+	if len(args) != 1 {
+		log.Fatalf("usage: cbt sql <QUERY>")
+	}
+	query := args[0]
+
+	// Get the terminal width.
+	termWidth, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		log.Fatalf("Getting terminal width: %v", err)
+	}
+
+
+	// Prepare and bind the statement.
+	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)
+	if err != nil {
+		log.Fatalf("While preparing statement: %v", err)
+	}
+	boundStmt, err := stmt.Bind(nil)
+	if err != nil {
+		log.Fatalf("While binding statement: %v", err)
+	}
+
+	// Execute the query, writing the result into the table util.
+	table := tablewriter.NewTable(os.Stdout, tablewriter.WithHeaderAutoFormat(tw.Off), tablewriter.WithMaxWidth(termWidth), tablewriter.WithRowAutoWrap(tw.WrapTruncate))
+	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
+		// Okay to output the header multiple times, only the first one has an effect.
+		hs := make([]string, len(row.Metadata.Columns))
+		for i := 0; i < len(row.Metadata.Columns); i++ {
+			hs[i] = row.Metadata.Columns[i].Name
+		}
+		table.Header(hs)
+
+		// Write out all values in the table.
+		vs := make([]string, len(row.Metadata.Columns))
+		for i := 0; i < len(row.Metadata.Columns); i++ {
+			v, err := getFormattedValue(row, i)
+			if err != nil {
+				log.Fatalf("Could not get formatted value for column %v: %v", row.Metadata.Columns[i], err)
+			}
+			vs[i] = v
+		}
+		table.Append(vs)
+		return true
+	})
+	table.Render()
 }
 
 func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {

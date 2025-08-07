@@ -835,12 +835,12 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name:     "sql",
-		Desc:     "Execute a SQL query on an Instance",
-		do:       doSql,
-		Usage:    "cbt sql <QUERY>\n\n" +
-		  "See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
-		  "Note that this does not support parameterized queries.\n",
+		Name: "sql",
+		Desc: "Execute a SQL query on an Instance",
+		do:   doSql,
+		Usage: "cbt sql <QUERY>\n\n" +
+			"See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
+			"Note that this does not support parameterized queries.\n",
 		Required: ProjectAndInstanceRequired,
 	},
 }
@@ -1425,7 +1425,7 @@ func doLookup(ctx context.Context, args ...string) {
 }
 
 func printRow(r bigtable.Row, w io.Writer) {
-  printRowAtTimezone(r, w, time.Local)
+	printRowAtTimezone(r, w, time.Local)
 }
 
 func printRowAtTimezone(r bigtable.Row, w io.Writer, loc *time.Location) {
@@ -1943,7 +1943,6 @@ func doSql(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("Getting terminal width: %v", err)
 	}
-
 
 	// Prepare and bind the statement.
 	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)

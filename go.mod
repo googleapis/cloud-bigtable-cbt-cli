@@ -12,7 +12,7 @@ require (
 	golang.org/x/sys v0.33.0
 	google.golang.org/api v0.237.0
 	google.golang.org/grpc v1.73.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
 )
 

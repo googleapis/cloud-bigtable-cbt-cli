@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/jhump/protoreflect v1.17.0 // Third-party dependency; proceed with caution
 	golang.org/x/oauth2 v0.30.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/sys v0.35.0
 	google.golang.org/api v0.237.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -39,7 +39,7 @@ require (
 
 require (
 	github.com/olekukonko/tablewriter v1.0.8
-	golang.org/x/term v0.32.0
+	golang.org/x/term v0.34.0
 )
 
 require (

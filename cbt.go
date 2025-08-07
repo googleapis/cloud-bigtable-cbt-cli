@@ -828,6 +828,13 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name:     "samplerowkeys",
+		Desc:     "Sample the row keys in a table",
+		do:       doSampleRowKeys,
+		Usage:    "cbt samplerowkeys <table-id>\n",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "sql",
 		Desc:     "Execute a SQL query on an Instance",
 		do:       doSql,
@@ -1971,6 +1978,21 @@ func doSql(ctx context.Context, args ...string) {
 		return true
 	})
 	table.Render()
+}
+
+func doSampleRowKeys(ctx context.Context, args ...string) {
+	if len(args) != 1 {
+		log.Fatalf("usage: cbt samplerowkeys <table>")
+	}
+
+	tbl := getClient(bigtable.ClientConfig{}).OpenTable(args[0])
+	keys, err := tbl.SampleRowKeys(ctx)
+	if err != nil {
+		log.Fatalf("Could not sample row keys: %v", err)
+	}
+	for k := range keys {
+		fmt.Println(k)
+	}
 }
 
 func parseStorageType(storageTypeStr string) (bigtable.StorageType, error) {

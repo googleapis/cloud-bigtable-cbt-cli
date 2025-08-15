@@ -43,8 +43,6 @@ import (
 	"cloud.google.com/go/bigtable"
 	"cloud.google.com/go/civil"
 	"github.com/olekukonko/tablewriter"
-	"github.com/olekukonko/tablewriter/tw"
-	"golang.org/x/term"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -2064,12 +2062,6 @@ func doSql(ctx context.Context, args ...string) {
 	}
 	query := args[0]
 
-	// Get the terminal width.
-	termWidth, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		log.Fatalf("Getting terminal width: %v", err)
-	}
-
 	// Prepare and bind the statement.
 	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)
 	if err != nil {
@@ -2081,14 +2073,19 @@ func doSql(ctx context.Context, args ...string) {
 	}
 
 	// Execute the query, writing the result into the table util.
-	table := tablewriter.NewTable(os.Stdout, tablewriter.WithHeaderAutoFormat(tw.Off), tablewriter.WithMaxWidth(termWidth), tablewriter.WithRowAutoWrap(tw.WrapTruncate))
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAutoWrapText(false)
+
 	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
 		// Okay to output the header multiple times, only the first one has an effect.
 		hs := make([]string, len(row.Metadata.Columns))
 		for i := 0; i < len(row.Metadata.Columns); i++ {
 			hs[i] = row.Metadata.Columns[i].Name
 		}
-		table.Header(hs)
+		table.SetHeader(hs)
 
 		// Write out all values in the table.
 		vs := make([]string, len(row.Metadata.Columns))

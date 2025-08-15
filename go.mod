@@ -5,13 +5,14 @@ go 1.23.0
 require (
 	cloud.google.com/go/bigtable v1.38.0
 	github.com/google/go-cmp v0.7.0
-	github.com/jhump/protoreflect v1.17.0 // Third-party dependency; proceed with caution
+	github.com/jhump/protoreflect v1.17.0
+	github.com/olekukonko/tablewriter v0.0.5
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.33.0
 	google.golang.org/api v0.237.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
-	gopkg.in/yaml.v2 v2.4.0 // Third-party dependency; proceed with caution
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 // IMPORTANT: If this ever changes, ensure that THIRD_PARTY_NOTICES.txt is
@@ -36,28 +37,18 @@ require (
 )
 
 require (
-	github.com/olekukonko/tablewriter v1.0.8
-	golang.org/x/term v0.32.0
-)
-
-require (
 	cel.dev/expr v0.23.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
-	github.com/fatih/color v1.15.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/olekukonko/errors v0.0.0-20250405072817-4e6d85265da6 // indirect
-	github.com/olekukonko/ll v0.0.8 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect

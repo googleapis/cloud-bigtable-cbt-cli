@@ -455,10 +455,6 @@ Usage:
 
 	cbt waitforreplication <table-id>
 
-	Usage:
-
-	cbt version
-
 # Tests whether the environment is correctly configured to support DirectPath connectivity
 to a specific Bigtable instance with a given app profile.
 This check validates network reachability and configuration required for the client

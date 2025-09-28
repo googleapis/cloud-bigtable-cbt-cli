@@ -668,6 +668,13 @@ var commands = []struct {
 		Usage:    "cbt listinstances",
 		Required: ProjectRequired,
 	},
+	{
+		Name:     "directaccess_connectivity",
+		Desc:     "Returns if Direct Access is supported",
+		do:       doDirectAccessConnectivity,
+		Usage:    "cbt directaccess_connectivity <instance-id> <app_profile>",
+		Required: ProjectAndInstanceRequired,
+	},
 	// {
 	// 	Name:     "listsnapshots",
 	// 	Desc:     "List backups in a cluster (deprecated)",
@@ -1327,6 +1334,26 @@ func doListInstances(ctx context.Context, args ...string) {
 		fmt.Fprintf(tw, "%s\t%s\n", i.Name, i.DisplayName)
 	}
 	tw.Flush()
+}
+
+func doDirectAccessConnectivity(ctx context.Context, args ...string) {
+	if len(args) != 1 {
+		log.Fatalf("usage: cbt directaccess_connectivity <app_profile>")
+	}
+	appProfileId := args[0]
+
+	supported, err := bigtable.CheckDirectAccessSupported(ctx, config.Project, config.Instance, appProfileId)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error during connectivity check: %v\n", err)
+		os.Exit(1)
+	}
+
+	if supported {
+		fmt.Println("✅ Success: Direct access (DirectPath) is supported.")
+	} else {
+		fmt.Println("❌ Failure: Direct access (DirectPath) is NOT supported.")
+		fmt.Println("   Please check your network configuration, VPC settings, and DNS resolution.")
+	}
 }
 
 func doListClusters(ctx context.Context, args ...string) {

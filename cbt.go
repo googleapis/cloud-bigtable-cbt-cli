@@ -672,7 +672,7 @@ var commands = []struct {
 		Name:     "directaccess_connectivity",
 		Desc:     "Returns if Direct Access is supported",
 		do:       doDirectAccessConnectivity,
-		Usage:    "cbt directaccess_connectivity <instance-id> <app_profile>",
+		Usage:    "cbt directaccess_connectivity <app-profile-id>",
 		Required: ProjectAndInstanceRequired,
 	},
 	// {
@@ -1338,7 +1338,7 @@ func doListInstances(ctx context.Context, args ...string) {
 
 func doDirectAccessConnectivity(ctx context.Context, args ...string) {
 	if len(args) != 1 {
-		log.Fatalf("usage: cbt directaccess_connectivity <app_profile>")
+		log.Fatalf("usage: cbt directaccess_connectivity<app-profile-id>")
 	}
 	appProfileId := args[0]
 

@@ -18,7 +18,7 @@ require (
 // IMPORTANT: If this ever changes, ensure that THIRD_PARTY_NOTICES.txt is
 // updated accordingly.
 require (
-	cloud.google.com/go v0.121.2
+	cloud.google.com/go v0.123.0
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
 	cloud.google.com/go/longrunning v0.6.7 // indirect

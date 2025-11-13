@@ -432,7 +432,7 @@ var commands = []struct {
 		Name:     "count",
 		Desc:     "Count rows in a table",
 		do:       doCount,
-		Usage:    "cbt count <table-id> [prefix=<row-key-prefix>]",
+		Usage:    "cbt count <table-id> [prefix=<row-key-prefix>] [app-profile=<app-profile-id>]",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -883,9 +883,9 @@ func doNotices(ctx context.Context, args ...string) {
 
 func doCount(ctx context.Context, args ...string) {
 	if len(args) < 1 {
-		log.Fatal("usage: cbt count <table> [prefix=<row-key-prefix>]")
+		log.Fatal("usage: cbt count <table> [prefix=<row-key-prefix>] [app-profile=<app-profile-id>]")
 	}
-	parsed, err := parseArgs(args[1:], []string{"prefix"})
+	parsed, err := parseArgs(args[1:], []string{"prefix", "app-profile"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -895,7 +895,7 @@ func doCount(ctx context.Context, args ...string) {
 		rr = bigtable.PrefixRange(prefix)
 	}
 
-	tbl := getTable(bigtable.ClientConfig{}, args[0])
+	tbl := getTable(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}, args[0])
 
 	filter := bigtable.ChainFilters(
 		bigtable.CellsPerRowLimitFilter(1),

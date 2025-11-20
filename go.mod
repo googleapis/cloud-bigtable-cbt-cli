@@ -1,6 +1,6 @@
 module cloud.google.com/go/cbt
 
-go 1.23.0
+go 1.24.0
 
 require (
 	cloud.google.com/go/bigtable v1.38.0
@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.17.0
 	github.com/olekukonko/tablewriter v0.0.5
 	golang.org/x/oauth2 v0.30.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/sys v0.38.0
 	google.golang.org/api v0.237.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -30,8 +30,8 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.2 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
@@ -61,8 +61,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.36.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect

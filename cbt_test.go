@@ -178,29 +178,21 @@ func TestParseColumnsFilter(t *testing.T) {
 			),
 		},
 		{
-			in:   "familyA:columnA:cellA",
-			fail: true,
+			in:  "familyA:columnA:cellA",
+			out: bigtable.ChainFilters(bigtable.FamilyFilter("familyA"), bigtable.ColumnFilter("columnA:cellA")),
 		},
 		{
-			in:   "familyA::columnA",
-			fail: true,
+			in:  "familyA::columnA",
+			out: bigtable.ChainFilters(bigtable.FamilyFilter("familyA"), bigtable.ColumnFilter(":columnA")),
+		},
+		{
+			in:  ":",
+			out: bigtable.ColumnFilter(""),
 		},
 	}
 
 	for _, tc := range tests {
-		got, err := parseColumnsFilter(tc.in)
-
-		if !tc.fail && err != nil {
-			t.Errorf("parseColumnsFilter(%q) unexpectedly failed: %v", tc.in, err)
-			continue
-		}
-		if tc.fail && err == nil {
-			t.Errorf("parseColumnsFilter(%q) did not fail", tc.in)
-			continue
-		}
-		if tc.fail {
-			continue
-		}
+		got := parseColumnsFilter(tc.in)
 
 		var cmpOpts cmp.Options
 		cmpOpts =
@@ -482,14 +474,14 @@ func TestPrintRowWithHighTimestamp(t *testing.T) {
 	mut := bigtable.NewMutation()
 
 	loc, err := time.LoadLocation("US/Pacific")
-	if (err != nil) {
+	if err != nil {
 		t.Fatalf("Failed to load timezone: %v", err)
 	}
 
 	// a timestamp that is just over int64 max in nanoseconds
 	mut.Set("my-family", "foo", 9223372036855000, []byte("bar"))
 	err = tbl.Apply(ctx, "my-key", mut)
-	if (err != nil) {
+	if err != nil {
 		t.Fatalf("Could not write some rows to prepare the test.")
 	}
 	row, err := tbl.ReadRow(ctx, "my-key")

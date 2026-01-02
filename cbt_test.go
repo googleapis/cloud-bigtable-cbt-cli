@@ -125,9 +125,8 @@ func TestParseArgs(t *testing.T) {
 
 func TestParseColumnsFilter(t *testing.T) {
 	tests := []struct {
-		in   string
-		out  bigtable.Filter
-		fail bool
+		in  string
+		out bigtable.Filter
 	}{
 		{
 			in:  "columnA",

@@ -12,5 +12,4 @@ branchProtectionRules:
   requiresCodeOwnerReviews: true
   requiresStrictStatusChecks: true
 permissionRules:
-  - team: cloud-native-db-dpes
     permission: admin

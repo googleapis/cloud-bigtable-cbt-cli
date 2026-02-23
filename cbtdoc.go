@@ -17,7 +17,7 @@
 //go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
 
 /*
-The `cbt` CLI is a command-line interface that lets you interact with Cloud Bigtable.
+The `cbt` CLI is a command-line interface that lets you interact with Bigtable.
 See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the `cbt` CLI.
 Before you use the `cbt` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
@@ -30,6 +30,7 @@ Usage:
 
 The commands are:
 
+	addtocell                 Add a value to an aggregate cell (write)
 	count                     Count rows in a table
 	createappprofile          Create app profile for an instance
 	createcluster             Create a cluster in the configured instance
@@ -57,12 +58,16 @@ The commands are:
 	notices                   Display licence information for any third-party dependencies
 	read                      Read rows
 	set                       Set value of a cell (write)
-	addtocell                 Add a value to an aggregate cell (write)
+	checkandmutate            Set a value based on the presence of any cell that matches the constraints
+	readmodifywrite           Update a cell with incremental operations based on the latest value of the cell
 	setgcpolicy               Set the garbage-collection policy (age, versions) for a column family
+	setvaluetype              Update column family's value type.
 	updateappprofile          Update app profile for an instance
 	updatecluster             Update a cluster in the configured instance
 	version                   Print the current cbt version
 	waitforreplication        Block until all the completed writes have been replicated to all the clusters
+	samplerowkeys             Sample the row keys in a table
+	sql                       Execute a SQL query on an Instance
 
 The options are:
 
@@ -79,8 +84,8 @@ Example:  cbt -instance=my-instance ls
 
 Use "cbt help \<command>" for more information about a command.
 
-Preview features are not currently available to most Cloud Bigtable customers. Alpha
-features might be changed in backward-incompatible ways and are not recommended
+Preview features are not available to most Bigtable customers, they
+might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
 Syntax rules for the Bash shell apply to the `cbt` CLI. This means, for example,
@@ -104,6 +109,23 @@ options to your ~/.cbtrc file in the following format:
 
 All values are optional and can be overridden at the command prompt.
 
+Add a value to an aggregate cell (write)
+
+Usage:
+
+	cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
+
+	  app-profile=<app profile id>          The app profile ID to use for the request
+	  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.
+
+	    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.
+	    timestamp is an optional integer.
+	    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
+	    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
+
+	    Examples:
+	      cbt addtocell table1 user1 sum_cf:col1=1@12345
+
 # Count rows in a table
 
 Usage:
@@ -126,6 +148,7 @@ Usage:
 Usage:
 
 	cbt createcluster <cluster-id> <zone> <num-nodes> <storage-type>
+
 	  cluster-id       Permanent, unique ID for the cluster in the instance
 	  zone             The zone in which to create the cluster
 	  num-nodes        The number of nodes to create
@@ -146,6 +169,7 @@ Usage:
 Usage:
 
 	cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>
+
 	  instance-id      Permanent, unique ID for the instance
 	  display-name     Description of the instance
 	  cluster-id       Permanent, unique ID for the cluster in the instance
@@ -161,10 +185,11 @@ Usage:
 
 	cbt createtable <table-id> [families=<family>:<gcpolicy-expression>:<type-expression>,...]
 	   [splits=<split-row-key-1>,<split-row-key-2>,...]
+
 	  families     Column families and their associated garbage collection (gc) policies and types.
 	               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,
 	               see "setgcpolicy".
-	               Currently only the type "intsum" is supported.
+	               Types "intsum", "intmin", "intmax", and "inthll" are supported.
 	  splits       Row key(s) where the table should initially be split
 
 	    Example: cbt createtable mobile-time-series "families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1" splits=tablet,phone
@@ -198,6 +223,7 @@ Usage:
 Usage:
 
 	cbt deletecolumn <table-id> <row-key> <family> <column> [app-profile=<app-profile-id>]
+
 	  app-profile=<app-profile-id>        The app profile ID to use for the request
 
 	    Example: cbt deletecolumn mobile-time-series phone#4c410523#20190501 stats_summary os_name
@@ -223,6 +249,7 @@ Usage:
 Usage:
 
 	cbt deleterow <table-id> <row-key> [app-profile=<app-profile-id>]
+
 	  app-profile=<app-profile-id>        The app profile ID to use for the request
 
 	    Example: cbt deleterow mobile-time-series phone#4c410523#20190501
@@ -260,6 +287,7 @@ Usage:
 Usage:
 
 	cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]
+
 	  app-profile=<app-profile-id>          The app profile ID to use for the request
 	  column-family=<family-name>           The column family label to use
 	  batch-size=<500>                      The max number of rows per batch write request
@@ -314,6 +342,7 @@ Usage:
 Usage:
 
 	cbt lookup <table-id> <row-key> [columns=<family>:<qualifier>,...] [cells-per-column=<n>] [app-profile=<app profile id>]
+
 	  row-key                             String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix
 	  columns=<family>:<qualifier>,...    Read only these columns, comma-separated
 	  cells-per-column=<n>                Read only this number of cells per column
@@ -351,6 +380,7 @@ Usage:
 Usage:
 
 	cbt read <table-id> [authorized-view=<authorized-view-id>] [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>] [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>] [app-profile=<app-profile-id>]
+
 	  authorized-view=<authorized-view-id>  Read from the specified authorized view of the table
 	  start=<row-key>                       Start reading at this row
 	  end=<row-key>                         Stop reading before this row
@@ -379,6 +409,7 @@ Set value of a cell (write)
 Usage:
 
 	cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
+
 	  authorized-view=<authorized-view-id>  Write to the specified authorized view of the table
 	  app-profile=<app profile id>          The app profile ID to use for the request
 	  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.
@@ -391,27 +422,49 @@ Usage:
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:connected_cell=1@12345 stats_summary:connected_cell=0@1570041766
 	      cbt set mobile-time-series phone#4c410523#20190501 stats_summary:os_build=PQ2A.190405.003 stats_summary:os_name=android
 
-Add a value to an aggregate cell (write)
+# Set a value based on the presence of any cell that matches the constraints
 
 Usage:
 
-	cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...
-	  app-profile=<app profile id>          The app profile ID to use for the request
-	  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.
+	cbt checkandmutate <table-id> <rowkey> [columns=<family:qualifier>,...] [true=<family>:<column>=<val>[@<timestamp>]] [false=<family>:<column>=<val>[@<timestamp>]]
 
+	  row-key                                String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix
+	  columns=<family>:<qualifier>,...       Test for values in these columns, comma-separated (optional)
+	  <family>:<column>=<val>[@<timestamp>]  A mutation to set if the lookup returned a cell value
 	    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.
 	    timestamp is an optional integer.
 	    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.
 	    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.
 
-	    Examples:
-	      cbt addtocell table1 user1 sum_cf:col1=1@12345
+	    At least one or both true=... or false=... must be provided. Optionally columns=... will restrict the existence test to the indicated columns.
+
+	  Examples:
+	    cbt checkandmutate mobile-time-series phone#4c410523#20190501 false=presence:=1
+	    cbt checkandmutate mobile-time-series phone#4c410523#20190501 columns=stats_summary:os_build true=stats_summary:connected_cell=1@12345
+
+# Update a cell with incremental operations based on the latest value of the cell
+
+Usage:
+
+	cbt readmodifywrite <table-id> <rowkey> <family> <qualifier> [append=<val>] [increment=<delta>]
+
+	  row-key                                String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix
+	  family                                 Column family
+	  qualifier                              Column qualifier
+	  append=<val>                           Append the given value to the cell
+	    If the cell is unset, it will be treated as an empty value.
+	  increment=<delta>                      Increment the cell by the given integer delta
+	    If the cell is unset, it will be treated as zero. If the cell is set and is not an 8-byte value, the operation will fail.
+
+	  Examples:
+	    cbt readmodifywrite mobile-time-series phone#4c410523#20190501 stats_summary boot_count increment=1
 
 # Set the garbage-collection policy (age, versions) for a column family
 
 Usage:
 
 	cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]
+
 	  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.
 	    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks
 	    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing
@@ -424,11 +477,23 @@ Usage:
 	      cbt setgcpolicy mobile-time-series stats_detail maxage=10d
 	      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 force
 
+Update column family's value type.
+
+Usage:
+
+	cbt setvaluetype <table> <family> <type>
+	      type: The type to be updated.
+	   Supported type(s):      stringutf8bytes: UTF8 encoded string
+	   Updating to or from aggregate types is currently unsupported.
+	   Example:
+	       cbt setvaluetype mobile-time-series vendor-info stringutf8bytes
+
 # Update app profile for an instance
 
 Usage:
 
 	cbt updateappprofile  <instance-id> <profile-id> <description>(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force]
+
 	  force:  Optional flag to override any warnings causing the command to fail
 
 	    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 "Use this one." route-any
@@ -438,6 +503,7 @@ Usage:
 Usage:
 
 	cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]
+
 	  cluster-id    Permanent, unique ID for the cluster in the instance
 	  num-nodes     The new number of nodes
 
@@ -454,5 +520,31 @@ Usage:
 Usage:
 
 	cbt waitforreplication <table-id>
+
+# Sample the row keys in a table
+
+Usage:
+
+	cbt samplerowkeys <table-id>
+
+# Execute a SQL query on an Instance
+
+Usage:
+
+	cbt sql <QUERY> [args ...]
+
+	  table-format=<true|false>                Whether to return the results in a table format (Default: true)
+
+	    Examples:
+	        cbt sql 'SELECT cell_data["os_build"] as os_build, cell_data["os_name"] as os_name FROM mobile-time-series LIMIT 10'
+	        cbt sql 'SELECT FORMAT("%s,%s,%s",
+	                           SAFE_CONVERT_BYTES_TO_STRING(cell_data["os_build"]),
+	                           SAFE_CONVERT_BYTES_TO_STRING(cell_data["os_name"]),
+	                           SAFE_CONVERT_BYTES_TO_STRING(cell_data["os_version"])
+	                        ) AS osBuild_osName_osVersion
+	                 FROM mobile-time-series' table-format=false
+
+	    See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.
+	    Note that this does not support parameterized queries.
 */
 package main

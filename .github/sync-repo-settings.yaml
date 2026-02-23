@@ -11,5 +11,3 @@ branchProtectionRules:
   requiredApprovingReviewCount: 1
   requiresCodeOwnerReviews: true
   requiresStrictStatusChecks: true
-permissionRules:
-    permission: admin

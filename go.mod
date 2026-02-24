@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/jhump/protoreflect v1.17.0
 	github.com/olekukonko/tablewriter v0.0.5
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sys v0.33.0
 	google.golang.org/api v0.237.0
 	google.golang.org/grpc v1.73.0

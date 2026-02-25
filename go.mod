@@ -1,6 +1,6 @@
 module cloud.google.com/go/cbt
 
-go 1.24.11
+go 1.25.0
 
 require (
 	cloud.google.com/go/bigtable v1.38.0

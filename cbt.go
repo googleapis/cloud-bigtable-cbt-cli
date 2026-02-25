@@ -75,6 +75,8 @@ type tableLike interface {
 func getCredentialOpts(opts []option.ClientOption) []option.ClientOption {
 	if ts := config.TokenSource; ts != nil {
 		opts = append(opts, option.WithTokenSource(ts))
+	} else if config.Unauthenticated {
+		opts = append(opts, option.WithoutAuthentication())
 	}
 	if tlsCreds := config.TLSCreds; tlsCreds != nil {
 		opts = append(opts, option.WithGRPCDialOption(grpc.WithTransportCredentials(tlsCreds)))

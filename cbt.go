@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/base64"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -29,6 +30,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -39,6 +41,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	"cloud.google.com/go/civil"
+	"github.com/olekukonko/tablewriter"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -219,8 +223,8 @@ func init() {
 }
 
 const configHelp = `
-Preview features are not currently available to most Cloud Bigtable customers. Alpha
-features might be changed in backward-incompatible ways and are not recommended
+Preview features are not available to most Bigtable customers, they
+might be changed in backward-incompatible ways and are not recommended
 for production use. They are not subject to any SLA or deprecation policy.
 
 Syntax rules for the Bash shell apply to the ` + "`cbt`" + ` CLI. This means, for example,
@@ -375,7 +379,7 @@ All values are optional and can be overridden at the command prompt.
 // ` + "```" + `
 // `
 
-const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Cloud Bigtable.
+const docIntroTemplate = `The ` + "`cbt`" + ` CLI is a command-line interface that lets you interact with Bigtable.
 See the [cbt CLI overview](https://cloud.google.com/bigtable/docs/cbt-overview) to learn how to install the ` + "`cbt`" + ` CLI.
 Before you use the ` + "`cbt`" + ` CLI, you should be familiar with the [Bigtable overview](https://cloud.google.com/bigtable/docs/overview).
 
@@ -410,10 +414,25 @@ var commands = []struct {
 	Required   RequiredFlags
 }{
 	{
+		Name: "addtocell",
+		Desc: "Add a value to an aggregate cell (write)",
+		do:   doAddToCell,
+		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n\n" +
+			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
+			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
+			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
+			"    timestamp is an optional integer. \n" +
+			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
+			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
+			"    Examples:\n" +
+			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "count",
 		Desc:     "Count rows in a table",
 		do:       doCount,
-		Usage:    "cbt count <table-id> [prefix=<row-key-prefix>]",
+		Usage:    "cbt count <table-id> [prefix=<row-key-prefix>] [app-profile=<app-profile-id>]",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -430,9 +449,9 @@ var commands = []struct {
 	},
 	{
 		Name: "createcluster",
-		Desc: "Create a cluster in the configured instance ",
+		Desc: "Create a cluster in the configured instance",
 		do:   doCreateCluster,
-		Usage: "cbt createcluster <cluster-id> <zone> <num-nodes> <storage-type>\n" +
+		Usage: "cbt createcluster <cluster-id> <zone> <num-nodes> <storage-type>\n\n" +
 			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
 			"  zone             The zone in which to create the cluster\n" +
 			"  num-nodes        The number of nodes to create\n" +
@@ -452,7 +471,7 @@ var commands = []struct {
 		Name: "createinstance",
 		Desc: "Create an instance with an initial cluster",
 		do:   doCreateInstance,
-		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n" +
+		Usage: "cbt createinstance <instance-id> <display-name> <cluster-id> <zone> <num-nodes> <storage-type>\n\n" +
 			"  instance-id      Permanent, unique ID for the instance\n" +
 			"  display-name     Description of the instance\n" +
 			"  cluster-id       Permanent, unique ID for the cluster in the instance\n" +
@@ -475,11 +494,11 @@ var commands = []struct {
 		Desc: "Create a table",
 		do:   doCreateTable,
 		Usage: "cbt createtable <table-id> [families=<family>:<gcpolicy-expression>:<type-expression>,...]\n" +
-			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n" +
+			"   [splits=<split-row-key-1>,<split-row-key-2>,...]\n\n" +
 			"  families     Column families and their associated garbage collection (gc) policies and types.\n" +
 			"               Put gc policies in quotes when they include shell operators && and ||. For gcpolicy,\n" +
 			"               see \"setgcpolicy\".\n" +
-			"               Currently only the type \"intsum\" is supported.\n" +
+			"               Types \"intsum\", \"intmin\", \"intmax\", and \"inthll\" are supported.\n" +
 			"  splits       Row key(s) where the table should initially be split\n\n" +
 			"    Example: cbt createtable mobile-time-series \"families=stats_summary:maxage=10d||maxversions=1,stats_detail:maxage=10d||maxversions=1\" splits=tablet,phone",
 		Required: ProjectAndInstanceRequired,
@@ -512,7 +531,7 @@ var commands = []struct {
 	},
 	{
 		Name: "deletecluster",
-		Desc: "Delete a cluster from the configured instance ",
+		Desc: "Delete a cluster from the configured instance",
 		do:   doDeleteCluster,
 		Usage: "cbt deletecluster <cluster-id>\n\n" +
 			"    Example: cbt deletecluster my-instance-c2",
@@ -522,7 +541,7 @@ var commands = []struct {
 		Name: "deletecolumn",
 		Desc: "Delete all cells in a column",
 		do:   doDeleteColumn,
-		Usage: "cbt deletecolumn <table-id> <row-key> <family> <column> [app-profile=<app-profile-id>]\n" +
+		Usage: "cbt deletecolumn <table-id> <row-key> <family> <column> [app-profile=<app-profile-id>]\n\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n\n" +
 			"    Example: cbt deletecolumn mobile-time-series phone#4c410523#20190501 stats_summary os_name",
 		Required: ProjectAndInstanceRequired,
@@ -547,7 +566,7 @@ var commands = []struct {
 		Name: "deleterow",
 		Desc: "Delete a row",
 		do:   doDeleteRow,
-		Usage: "cbt deleterow <table-id> <row-key> [app-profile=<app-profile-id>]\n" +
+		Usage: "cbt deleterow <table-id> <row-key> [app-profile=<app-profile-id>]\n\n" +
 			"  app-profile=<app-profile-id>        The app profile ID to use for the request\n\n" +
 			"    Example: cbt deleterow mobile-time-series phone#4c410523#20190501",
 		Required: ProjectAndInstanceRequired,
@@ -600,7 +619,7 @@ var commands = []struct {
 		Name: "import",
 		Desc: "Batch write many rows based on the input file",
 		do:   doImport,
-		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]\n" +
+		Usage: "cbt import <table-id> <input-file> [app-profile=<app-profile-id>] [column-family=<family-name>] [batch-size=<500>] [workers=<1>] [timestamp=<now|value-encoded>]\n\n" +
 			"  app-profile=<app-profile-id>          The app profile ID to use for the request\n" +
 			"  column-family=<family-name>           The column family label to use\n" +
 			"  batch-size=<500>                      The max number of rows per batch write request\n" +
@@ -632,7 +651,7 @@ var commands = []struct {
 		Name:     "listappprofile",
 		Desc:     "Lists app profile for an instance",
 		do:       doListAppProfiles,
-		Usage:    "cbt listappprofile <instance-id> ",
+		Usage:    "cbt listappprofile <instance-id>",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -661,7 +680,7 @@ var commands = []struct {
 		Desc: "Read from a single row",
 		do:   doLookup,
 		Usage: "cbt lookup <table-id> <row-key> [columns=<family>:<qualifier>,...] [cells-per-column=<n>]" +
-			" [app-profile=<app profile id>]\n" +
+			" [app-profile=<app profile id>]\n\n" +
 			"  row-key                             String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
 			"  columns=<family>:<qualifier>,...    Read only these columns, comma-separated\n" +
 			"  cells-per-column=<n>                Read only this number of cells per column\n" +
@@ -703,7 +722,7 @@ var commands = []struct {
 		do:   doRead,
 		Usage: "cbt read <table-id> [authorized-view=<authorized-view-id>] [start=<row-key>] [end=<row-key>] [prefix=<row-key-prefix>]" +
 			" [regex=<regex>] [columns=<family>:<qualifier>,...] [count=<n>] [cells-per-column=<n>]" +
-			" [app-profile=<app-profile-id>]\n" +
+			" [app-profile=<app-profile-id>]\n\n" +
 			"  authorized-view=<authorized-view-id>  Read from the specified authorized view of the table\n" +
 			"  start=<row-key>                       Start reading at this row\n" +
 			"  end=<row-key>                         Stop reading before this row\n" +
@@ -731,7 +750,7 @@ var commands = []struct {
 		Name: "set",
 		Desc: "Set value of a cell (write)",
 		do:   doSet,
-		Usage: "cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
+		Usage: "cbt set <table-id> <row-key> [authorized-view=<authorized-view-id>] [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n\n" +
 			"  authorized-view=<authorized-view-id>  Write to the specified authorized view of the table\n" +
 			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
 			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
@@ -744,31 +763,66 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
-		Name: "addtocell",
-		Desc: "Add a value to an aggregate cell (write)",
-		do:   doAddToCell,
-		Usage: "cbt addtocell <table-id> <row-key> [app-profile=<app-profile-id>] <family>:<column>=<val>[@<timestamp>] ...\n" +
-			"  app-profile=<app profile id>          The app profile ID to use for the request\n" +
-			"  <family>:<column>=<val>[@<timestamp>] may be repeated to set multiple cells.\n\n" +
+		Name: "checkandmutate",
+		Desc: "Set a value based on the presence of any cell that matches the constraints",
+		do:   doCheckAndMutate,
+		Usage: "cbt checkandmutate <table-id> <rowkey> [columns=<family:qualifier>,...] [true=<family>:<column>=<val>[@<timestamp>]] [false=<family>:<column>=<val>[@<timestamp>]]\n\n" +
+			"  row-key                                String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
+			"  columns=<family>:<qualifier>,...       Test for values in these columns, comma-separated (optional)\n" +
+			"  <family>:<column>=<val>[@<timestamp>]  A mutation to set if the lookup returned a cell value\n" +
 			"    If <val> can be parsed as an integer it will be used as one, otherwise the call will fail.\n" +
-			"    timestamp is an optional integer. \n" +
+			"    timestamp is an optional integer.\n" +
 			"    If the timestamp cannot be parsed, '@<timestamp>' will be interpreted as part of the value.\n" +
 			"    For most uses, a timestamp is the number of microseconds since 1970-01-01 00:00:00 UTC.\n\n" +
-			"    Examples:\n" +
-			"      cbt addtocell table1 user1 sum_cf:col1=1@12345",
+			"    At least one or both true=... or false=... must be provided. Optionally columns=... will restrict the existence test to the indicated columns.\n\n" +
+			"  Examples:\n" +
+			"    cbt checkandmutate mobile-time-series phone#4c410523#20190501 false=presence:=1\n" +
+			"    cbt checkandmutate mobile-time-series phone#4c410523#20190501 columns=stats_summary:os_build true=stats_summary:connected_cell=1@12345",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "readmodifywrite",
+		Desc: "Update a cell with incremental operations based on the latest value of the cell",
+		do:   doReadModifyWrite,
+		Usage: "cbt readmodifywrite <table-id> <rowkey> <family> <qualifier> [append=<val>] [increment=<delta>]\n\n" +
+			"  row-key                                String or raw bytes. Raw bytes must be enclosed in single quotes and have a dollar-sign prefix\n" +
+			"  family                                 Column family\n" +
+			"  qualifier                              Column qualifier\n" +
+			"  append=<val>                           Append the given value to the cell\n" +
+			"    If the cell is unset, it will be treated as an empty value.\n" +
+			"  increment=<delta>                      Increment the cell by the given integer delta\n" +
+			"    If the cell is unset, it will be treated as zero. If the cell is set and is not an 8-byte value, the operation will fail.\n\n" +
+			"  Examples:\n" +
+			"    cbt readmodifywrite mobile-time-series phone#4c410523#20190501 stats_summary boot_count increment=1\n",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
 		Name: "setgcpolicy",
 		Desc: "Set the garbage-collection policy (age, versions) for a column family",
 		do:   doSetGCPolicy,
-		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)\n" +
+		Usage: "cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]\n\n" +
+			"  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.\n" +
+			"    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks\n" +
+			"    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing\n\n" +
 			"  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d\n" +
 			"  maxversions=<n>    Maximum number of versions to preserve\n" +
 			"  Put garbage collection policies in quotes when they include shell operators && and ||.\n\n" +
 			"    Examples:\n" +
 			"      cbt setgcpolicy mobile-time-series stats_detail maxage=10d\n" +
-			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1\n",
+			"      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 force\n",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "setvaluetype",
+		Desc: "Update column family's value type.",
+		do:   doSetFamilyValueType,
+		Usage: "cbt setvaluetype <table> <family> <type>\n" +
+			"      type: The type to be updated.\n" +
+			"   Supported type(s):" +
+			"      stringutf8bytes: UTF8 encoded string\n" +
+			"   Updating to or from aggregate types is currently unsupported.\n" +
+			"   Example:\n" +
+			"       cbt setvaluetype mobile-time-series vendor-info stringutf8bytes",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -776,7 +830,7 @@ var commands = []struct {
 		Desc: "Update app profile for an instance",
 		do:   doUpdateAppProfile,
 		Usage: "cbt updateappprofile  <instance-id> <profile-id> <description>" +
-			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n" +
+			"(route-any | [ route-to=<cluster-id> : transactional-writes]) [-force] \n\n" +
 			"  force:  Optional flag to override any warnings causing the command to fail\n\n" +
 			"    Example: cbt updateappprofile my-instance multi-cluster-app-profile-1 \"Use this one.\" route-any",
 		Required: ProjectAndInstanceRequired,
@@ -785,7 +839,7 @@ var commands = []struct {
 		Name: "updatecluster",
 		Desc: "Update a cluster in the configured instance",
 		do:   doUpdateCluster,
-		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n" +
+		Usage: "cbt updatecluster <cluster-id> [num-nodes=<num-nodes>]\n\n" +
 			"  cluster-id    Permanent, unique ID for the cluster in the instance\n" +
 			"  num-nodes     The new number of nodes\n\n" +
 			"    Example: cbt updatecluster my-instance-c1 num-nodes=5",
@@ -805,6 +859,22 @@ var commands = []struct {
 		Usage:    "cbt waitforreplication <table-id>\n",
 		Required: ProjectAndInstanceRequired,
 	},
+	{
+		Name:     "samplerowkeys",
+		Desc:     "Sample the row keys in a table",
+		do:       doSampleRowKeys,
+		Usage:    "cbt samplerowkeys <table-id>\n",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "sql",
+		Desc: "Execute a SQL query on an Instance",
+		do:   doSql,
+		Usage: "cbt sql <QUERY>\n\n" +
+			"See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
+			"Note that this does not support parameterized queries.\n",
+		Required: ProjectAndInstanceRequired,
+	},
 }
 
 func doNotices(ctx context.Context, args ...string) {
@@ -813,9 +883,9 @@ func doNotices(ctx context.Context, args ...string) {
 
 func doCount(ctx context.Context, args ...string) {
 	if len(args) < 1 {
-		log.Fatal("usage: cbt count <table> [prefix=<row-key-prefix>]")
+		log.Fatal("usage: cbt count <table> [prefix=<row-key-prefix>] [app-profile=<app-profile-id>]")
 	}
-	parsed, err := parseArgs(args[1:], []string{"prefix"})
+	parsed, err := parseArgs(args[1:], []string{"prefix", "app-profile"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -825,7 +895,7 @@ func doCount(ctx context.Context, args ...string) {
 		rr = bigtable.PrefixRange(prefix)
 	}
 
-	tbl := getTable(bigtable.ClientConfig{}, args[0])
+	tbl := getTable(bigtable.ClientConfig{AppProfile: parsed["app-profile"]}, args[0])
 
 	filter := bigtable.ChainFilters(
 		bigtable.CellsPerRowLimitFilter(1),
@@ -843,10 +913,27 @@ func doCount(ctx context.Context, args ...string) {
 }
 
 func parseFamilyType(s string) (bigtable.Type, error) {
-	if strings.ToLower(s) == "intsum" {
+	sl := strings.ToLower(s)
+	if sl == "intsum" {
 		return bigtable.AggregateType{
 			Input:      bigtable.Int64Type{},
 			Aggregator: bigtable.SumAggregator{}}, nil
+	} else if sl == "intmin" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.MinAggregator{}}, nil
+	} else if sl == "intmax" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.MaxAggregator{}}, nil
+	} else if sl == "inthll" {
+		return bigtable.AggregateType{
+			Input:      bigtable.Int64Type{},
+			Aggregator: bigtable.HllppUniqueCountAggregator{}}, nil
+	} else if sl == "stringutf8bytes" {
+		return bigtable.StringType{
+			Encoding: bigtable.StringUtf8Encoding{},
+		}, nil
 	}
 	return nil, fmt.Errorf("unknown type %s", s)
 }
@@ -865,9 +952,30 @@ func parseFamilyText(family string) (string, bigtable.Family, error) {
 		}
 		if len(famPolicy) == 3 {
 			tpe, err = parseFamilyType(famPolicy[2])
+			if err != nil {
+				return "", bigtable.Family{}, err
+			}
 		}
 	}
 	return famPolicy[0], bigtable.Family{GCPolicy: gcPolicy, ValueType: tpe}, nil
+}
+
+func doSetFamilyValueType(ctx context.Context, args ...string) {
+	if len(args) < 3 {
+		log.Fatal("usage: cbt setvaluetype <table> <family> <type>")
+	}
+	familyType, err := parseFamilyType(args[2])
+	if err != nil {
+		log.Fatalf("Failed to update family value type: %v", err)
+	}
+
+	err = getAdminClient().UpdateFamily(ctx, args[0] /*table*/, args[1], /*familyName*/
+		bigtable.Family{
+			ValueType: familyType,
+		})
+	if err != nil {
+		log.Fatalf("Set value type: %v", err)
+	}
 }
 
 func doCreateTable(ctx context.Context, args ...string) {
@@ -1349,6 +1457,10 @@ func doLookup(ctx context.Context, args ...string) {
 }
 
 func printRow(r bigtable.Row, w io.Writer) {
+	printRowAtTimezone(r, w, time.Local)
+}
+
+func printRowAtTimezone(r bigtable.Row, w io.Writer, loc *time.Location) {
 	fmt.Fprintln(w, strings.Repeat("-", 40))
 	fmt.Fprintln(w, r.Key())
 
@@ -1361,10 +1473,10 @@ func printRow(r bigtable.Row, w io.Writer) {
 		ris := r[fam]
 		sort.Sort(byColumn(ris))
 		for _, ri := range ris {
-			ts := time.Unix(0, int64(ri.Timestamp)*1e3)
+			ts := time.UnixMicro(int64(ri.Timestamp))
 			fmt.Fprintf(w, "  %-40s @ %s\n",
 				ri.Column,
-				ts.Format("2006/01/02-15:04:05.000000"))
+				ts.In(loc).Format("2006/01/02-15:04:05.000000"))
 			formatted, err :=
 				globalValueFormatting.format(
 					"    ", fam, ri.Column, ri.Value)
@@ -1409,10 +1521,14 @@ func doLS(ctx context.Context, args ...string) {
 		}
 		sort.Sort(byFamilyName(ti.FamilyInfos))
 		tw := tabwriter.NewWriter(os.Stdout, 10, 8, 4, '\t', 0)
-		fmt.Fprintf(tw, "Family Name\tGC Policy\n")
-		fmt.Fprintf(tw, "-----------\t---------\n")
+		fmt.Fprintf(tw, "Family Name\tGC Policy\tValue Type\n")
+		fmt.Fprintf(tw, "-----------\t---------\t----------\n")
 		for _, fam := range ti.FamilyInfos {
-			fmt.Fprintf(tw, "%s\t%s\n", fam.Name, fam.GCPolicy)
+			jsonString, err := bigtable.MarshalJSON(fam.ValueType)
+			if err != nil {
+				log.Fatalf("Getting table info: %v", err)
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", fam.Name, fam.GCPolicy, jsonString)
 		}
 		tw.Flush()
 	}
@@ -1580,6 +1696,25 @@ func doRead(ctx context.Context, args ...string) {
 
 var setArg = regexp.MustCompile(`([^:]+):([^=]*)=(.*)`)
 
+func addToMutation(mut *bigtable.Mutation, arg string) error {
+	m := setArg.FindStringSubmatch(arg)
+	if m == nil {
+		return fmt.Errorf("Bad set arg %q", arg)
+	}
+	val := m[3]
+	ts := bigtable.Now()
+	if i := strings.LastIndex(val, "@"); i >= 0 {
+		// Try parsing a timestamp.
+		n, err := strconv.ParseInt(val[i+1:], 0, 64)
+		if err == nil {
+			val = val[:i]
+			ts = bigtable.Timestamp(n)
+		}
+	}
+	mut.Set(m[1], m[2], ts, []byte(val))
+	return nil
+}
+
 func doSet(ctx context.Context, args ...string) {
 	if len(args) < 3 {
 		log.Fatalf("usage: cbt set <table> <row> [authorized-view=<authorized-view-id>] [app-profile=<app profile id>] family:[column]=val[@ts] ...")
@@ -1597,21 +1732,9 @@ func doSet(ctx context.Context, args ...string) {
 			authorizedView = strings.Split(arg, "=")[1]
 			continue
 		}
-		m := setArg.FindStringSubmatch(arg)
-		if m == nil {
-			log.Fatalf("Bad set arg %q", arg)
+		if err := addToMutation(mut, arg); err != nil {
+			log.Fatal(err)
 		}
-		val := m[3]
-		ts := bigtable.Now()
-		if i := strings.LastIndex(val, "@"); i >= 0 {
-			// Try parsing a timestamp.
-			n, err := strconv.ParseInt(val[i+1:], 0, 64)
-			if err == nil {
-				val = val[:i]
-				ts = bigtable.Timestamp(n)
-			}
-		}
-		mut.Set(m[1], m[2], ts, []byte(val))
 	}
 
 	var tbl bigtable.TableAPI
@@ -1624,6 +1747,91 @@ func doSet(ctx context.Context, args ...string) {
 	if err := tbl.Apply(ctx, row, mut); err != nil {
 		log.Fatalf("Applying mutation: %v", err)
 	}
+}
+
+func doCheckAndMutate(ctx context.Context, args ...string) {
+	if len(args) < 3 {
+		log.Fatalf("cbt checkandmutate <table-id> <rowkey> [columns=<family:qualifier>] [true=<family>:<column>=<val>[@<timestamp>]] [false=<family>:<column>=<val>[@<timestamp>]]")
+	}
+	parsed, err := parseArgs(args[2:], []string{"columns", "true", "false"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Parse the lookup test.
+	filter := bigtable.LatestNFilter(1)
+	if arg, ok := parsed["columns"]; ok {
+		var err error
+		if filter, err = parseColumnsFilter(arg); err != nil {
+			log.Fatalf("While parsing columns=...: %v", err)
+		}
+	}
+
+	// Parse mutations.
+	var t, f *bigtable.Mutation
+	if arg, ok := parsed["true"]; ok {
+		t = bigtable.NewMutation()
+		if err := addToMutation(t, arg); err != nil {
+			log.Fatalf("While parsing true=... mutation: %v", err)
+		}
+	}
+	if arg, ok := parsed["false"]; ok {
+		f = bigtable.NewMutation()
+		if err := addToMutation(f, arg); err != nil {
+			log.Fatalf("While parsing false=... mutation: %v", err)
+		}
+	}
+	if t == nil && f == nil {
+		log.Fatalf("Need at least one of true=... or false=...")
+	}
+
+	mut := bigtable.NewCondMutation(filter, t, f)
+	tbl := getClient(bigtable.ClientConfig{}).OpenTable(args[0])
+	if err := tbl.Apply(ctx, args[1], mut); err != nil {
+		log.Fatalf("Applying conditional mutation: %v", err)
+	}
+}
+
+func doReadModifyWrite(ctx context.Context, args ...string) {
+	if len(args) < 5 {
+		log.Fatalf("cbt readmodifywrite <table-id> <rowkey> <family> <qualifier> [append=<val>] [increment=<delta>]")
+	}
+	table := args[0]
+	rowkey := args[1]
+	family := args[2]
+	qualifier := args[3]
+
+	parsed, err := parseArgs(args[4:], []string{"append", "increment"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ap, apOk := parsed["append"]
+	inc, incOk := parsed["increment"]
+	if apOk && incOk {
+		log.Fatalf("Cannot both append and increment, choose one")
+	}
+
+	mut := bigtable.NewReadModifyWrite()
+	if apOk {
+		mut.AppendValue(family, qualifier, []byte(ap))
+	} else if incOk {
+		delta, err := strconv.ParseInt(inc, 0, 64)
+		if err != nil {
+			log.Fatalf("While parsing increment=...: %v", err)
+		}
+		mut.Increment(family, qualifier, delta)
+	}
+
+	tbl := getClient(bigtable.ClientConfig{}).OpenTable(table)
+	r, err := tbl.ApplyReadModifyWrite(ctx, rowkey, mut)
+	if err != nil {
+		log.Fatalf("Applying read modify write: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printRow(r, &buf)
+	fmt.Println(buf.String())
 }
 
 func doAddToCell(ctx context.Context, args ...string) {
@@ -1668,15 +1876,33 @@ func doAddToCell(ctx context.Context, args ...string) {
 
 func doSetGCPolicy(ctx context.Context, args ...string) {
 	if len(args) < 3 {
-		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)")
+		log.Fatalf("usage: cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]")
 	}
 	table := args[0]
 	fam := args[1]
-	pol, err := parseGCPolicy(strings.Join(args[2:], " "))
+
+	// Remaining possible args are `force` and the gc policy itself, which may be
+	// arbitrarily long. Since `force` in the middle of the policy would be invalid
+	// we check only the next and last elements
+	remainingArgs := args[2:]
+	force := false
+	if remainingArgs[0] == "force" {
+		remainingArgs = remainingArgs[1:]
+		force = true
+	} else if remainingArgs[len(remainingArgs)-1] == "force" {
+		remainingArgs = remainingArgs[:len(remainingArgs)-1]
+		force = true
+	}
+
+	pol, err := parseGCPolicy(strings.Join(remainingArgs, " "))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := getAdminClient().SetGCPolicy(ctx, table, fam, pol); err != nil {
+	opts := []bigtable.GCPolicyOption{}
+	if force {
+		opts = append(opts, bigtable.IgnoreWarnings())
+	}
+	if err := getAdminClient().SetGCPolicyWithOptions(ctx, table, fam, pol, opts...); err != nil {
 		log.Fatalf("Setting GC policy: %v", err)
 	}
 }
@@ -1690,6 +1916,204 @@ func doWaitForReplicaiton(ctx context.Context, args ...string) {
 	fmt.Printf("Waiting for all writes up to %s to be replicated.\n", time.Now().Format("2006/01/02-15:04:05"))
 	if err := getAdminClient().WaitForReplication(ctx, table); err != nil {
 		log.Fatalf("Waiting for replication: %v", err)
+	}
+}
+
+// Converts a string with non UTF-8 characters into a UTF-8 string.
+func utf8(s string) string {
+	return strings.ToValidUTF8(s, "�")
+}
+
+// formatDecodedValue recursively formats a SQLType value into a human-readable string.
+func formatDecodedValue(t bigtable.SQLType, v reflect.Value) (string, error) {
+	// Handle structs first, they are a bit special.
+	if st, ok := t.(bigtable.StructSQLType); ok {
+		s, ok := v.Interface().(bigtable.Struct)
+		if !ok {
+			return "", fmt.Errorf("struct is not aligned with type")
+		}
+
+		// Format them as a map.
+		formattedMap := make(map[string]string)
+		for i, f := range st.Fields {
+			st := sqlTypeToReflectType(f.Type)
+			valT := reflect.New(st).Interface()
+			if err := s.GetByIndex(i, valT); err != nil {
+				return "", err
+			}
+
+			fv, err := formatDecodedValue(f.Type, reflect.ValueOf(valT).Elem())
+			if err != nil {
+				return "", err
+			}
+			formattedMap[utf8(f.Name)] = fv
+		}
+		return fmt.Sprintf("%v", formattedMap), nil
+	}
+
+	switch v.Kind() {
+	case reflect.Slice:
+		// Slices of bytes should become UTF-8 strings.
+		if v.Type() == reflect.TypeOf([]byte{}) {
+			return utf8(string(v.Interface().([]byte))), nil
+		}
+
+		// Otherwise these should be Array SQLTypes
+		formattedSlice := make([]string, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			fv, err := formatDecodedValue(t.(bigtable.ArraySQLType).ElemType, v.Index(i))
+			if err != nil {
+				return "", err
+			}
+			formattedSlice[i] = fv
+		}
+		return fmt.Sprintf("%v", formattedSlice), nil
+
+	case reflect.Map:
+		formattedMap := make(map[string]string)
+		iter := v.MapRange()
+		for iter.Next() {
+			var err error
+			var k []byte
+			if iter.Key().Type().Kind() == reflect.String {
+				// Keys are base64 encoded, so extract them. If we can't fallback to showing base64.
+				k, err = base64.StdEncoding.DecodeString(iter.Key().Interface().(string))
+				if err != nil {
+					k = []byte(iter.Key().Interface().(string))
+				}
+			} else if iter.Key().Type() == reflect.TypeOf([]byte{}) {
+				// Same as the above, but treat a byte array as a string for maps.
+				var n int
+				n, err = base64.StdEncoding.Decode(k, iter.Key().Interface().([]byte))
+				if n != len(iter.Key().Interface().([]byte)) || err != nil {
+					k = iter.Key().Interface().([]byte)
+				}
+			} else {
+				// Otherwise format the key according to its type.
+				fv, err := formatDecodedValue(t.(bigtable.MapSQLType).KeyType, iter.Key())
+				if err != nil {
+					return "", err
+				}
+				k = []byte(fv)
+			}
+			fv, err := formatDecodedValue(t.(bigtable.MapSQLType).ValueType, iter.Value())
+			if err != nil {
+				return "", err
+			}
+			formattedMap[utf8(string(k))] = fv
+		}
+		return fmt.Sprintf("%v", formattedMap), nil
+
+	default:
+		// Rely on golang's default value printing for everything else.
+		return utf8(fmt.Sprintf("%v", v.Interface())), nil
+	}
+}
+
+// sqlTypeToReflectType translates Bigtable SQL type metadata to a Go reflect.Type using recursion.
+func sqlTypeToReflectType(t bigtable.SQLType) reflect.Type {
+	switch t.(type) {
+	case bigtable.StringSQLType:
+		return reflect.TypeOf("")
+	case bigtable.BytesSQLType:
+		return reflect.TypeOf([]byte{})
+	case bigtable.Int64SQLType:
+		return reflect.TypeOf(int64(0))
+	case bigtable.Float32SQLType:
+		return reflect.TypeOf(float32(0))
+	case bigtable.Float64SQLType:
+		return reflect.TypeOf(float64(0))
+	case bigtable.BoolSQLType:
+		return reflect.TypeOf(false)
+	case bigtable.TimestampSQLType:
+		return reflect.TypeOf(time.Time{})
+	case bigtable.DateSQLType:
+		return reflect.TypeOf(civil.Date{})
+	case bigtable.StructSQLType:
+		return reflect.TypeOf(bigtable.Struct{})
+	case bigtable.MapSQLType:
+		k := sqlTypeToReflectType(t.(bigtable.MapSQLType).KeyType)
+		if reflect.TypeOf(t.(bigtable.MapSQLType).KeyType) == reflect.TypeOf(bigtable.BytesSQLType{}) {
+			k = sqlTypeToReflectType(bigtable.StringSQLType{})
+		}
+		v := sqlTypeToReflectType(t.(bigtable.MapSQLType).ValueType)
+		return reflect.MapOf(k, v)
+	case bigtable.ArraySQLType:
+		v := sqlTypeToReflectType(t.(bigtable.ArraySQLType).ElemType)
+		return reflect.SliceOf(v)
+	}
+	return reflect.TypeOf(new(interface{})).Elem()
+}
+
+// getFormattedValue decodes a value from a ResultRow and formats it for display.
+func getFormattedValue(row bigtable.ResultRow, index int) (string, error) {
+	// Get a pointer to the value in the row.
+	t := sqlTypeToReflectType(row.Metadata.Columns[index].SQLType)
+	valT := reflect.New(t).Interface()
+	if err := row.GetByIndex(index, valT); err != nil {
+		return "", err
+	}
+	return formatDecodedValue(row.Metadata.Columns[index].SQLType, reflect.ValueOf(valT).Elem())
+}
+
+func doSql(ctx context.Context, args ...string) {
+	if len(args) != 1 {
+		log.Fatalf("usage: cbt sql <QUERY>")
+	}
+	query := args[0]
+
+	// Prepare and bind the statement.
+	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)
+	if err != nil {
+		log.Fatalf("While preparing statement: %v", err)
+	}
+	boundStmt, err := stmt.Bind(nil)
+	if err != nil {
+		log.Fatalf("While binding statement: %v", err)
+	}
+
+	// Execute the query, writing the result into the table util.
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAutoWrapText(false)
+
+	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
+		// Okay to output the header multiple times, only the first one has an effect.
+		hs := make([]string, len(row.Metadata.Columns))
+		for i := 0; i < len(row.Metadata.Columns); i++ {
+			hs[i] = row.Metadata.Columns[i].Name
+		}
+		table.SetHeader(hs)
+
+		// Write out all values in the table.
+		vs := make([]string, len(row.Metadata.Columns))
+		for i := 0; i < len(row.Metadata.Columns); i++ {
+			v, err := getFormattedValue(row, i)
+			if err != nil {
+				log.Fatalf("Could not get formatted value for column %v: %v", row.Metadata.Columns[i], err)
+			}
+			vs[i] = v
+		}
+		table.Append(vs)
+		return true
+	})
+	table.Render()
+}
+
+func doSampleRowKeys(ctx context.Context, args ...string) {
+	if len(args) != 1 {
+		log.Fatalf("usage: cbt samplerowkeys <table>")
+	}
+
+	tbl := getClient(bigtable.ClientConfig{}).OpenTable(args[0])
+	keys, err := tbl.SampleRowKeys(ctx)
+	if err != nil {
+		log.Fatalf("Could not sample row keys: %v", err)
+	}
+	for k := range keys {
+		fmt.Println(k)
 	}
 }
 

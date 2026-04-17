@@ -47,6 +47,7 @@ set -x
 
 # cd to project dir on Kokoro instance
 cd github/cloud-bigtable-cbt-cli
+git config --global --add safe.directory "$(pwd)/./.git"
 
 go version
 

@@ -411,14 +411,18 @@ Usage:
 
 Usage:
 
-	cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never)
+	cbt setgcpolicy <table> <family> ((maxage=<d> | maxversions=<n>) [(and|or) (maxage=<d> | maxversions=<n>),...] | never) [force]
+	  force: Optional flag to override warnings when relaxing the garbage-collection policy on replicated clusters.
+	    This may cause your clusters to be temporarily inconsistent, make sure you understand the risks
+	    listed at https://cloud.google.com/bigtable/docs/garbage-collection#increasing
+
 	  maxage=<d>         Maximum timestamp age to preserve. Acceptable units: ms, s, m, h, d
 	  maxversions=<n>    Maximum number of versions to preserve
 	  Put garbage collection policies in quotes when they include shell operators && and ||.
 
 	    Examples:
 	      cbt setgcpolicy mobile-time-series stats_detail maxage=10d
-	      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1
+	      cbt setgcpolicy mobile-time-series stats_summary maxage=10d or maxversions=1 force
 
 # Update app profile for an instance
 

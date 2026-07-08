@@ -571,8 +571,8 @@ func TestJSONAndYAML(t *testing.T) {
 	printRow(row, &out)
 	got := out.String()
 	want := ("----------------------------------------\n" +
-		"r1\n" +
-		"  f1:json\n" +
+		"\"r1\"\n" +
+		"  \"f1:json\"\n" +
 		"    age:     2.00\n" +
 		"    name:   \"Brave\"")
 
@@ -603,8 +603,8 @@ func TestProtobufferAndYAML(t *testing.T) {
 	printRow(row, &out)
 	got := out.String()
 	want := ("----------------------------------------\n" +
-		"r1\n" +
-		"  f1:cat\n" +
+		"\"r1\"\n" +
+		"  \"f1:cat\"\n" +
 		"    name: \"Brave\"\n" +
 		"    age: 2")
 
@@ -650,12 +650,12 @@ func TestPrintRow(t *testing.T) {
 	got := out.String()
 	want :=
 		"----------------------------------------\n" +
-			"r1\n" +
-			"  f1:c1\n" +
+			"\"r1\"\n" +
+			"  \"f1:c1\"\n" +
 			"    \"Hello!\"\n" +
-			"  f1:c2\n" +
+			"  \"f1:c2\"\n" +
 			"    \"\\x01\\x02\"\n" +
-			"  f2:person\n" +
+			"  \"f2:person\"\n" +
 			"    \"\\n\\x03Jim\\x10*\\x1a\\x0fjim@example.com\\\"\\f\\n\\b555-1212\\x10\\x01\"\n" +
 			""
 
@@ -684,12 +684,12 @@ func TestPrintRow(t *testing.T) {
 	globalValueFormatting.setup("")
 
 	want = ("----------------------------------------\n" +
-		"r1\n" +
-		"  f1:c1\n" +
+		"\"r1\"\n" +
+		"  \"f1:c1\"\n" +
 		"    \"Hello!\"\n" +
-		"  f1:c2\n" +
+		"  \"f1:c2\"\n" +
 		"    258\n" +
-		"  f2:person\n" +
+		"  \"f2:person\"\n" +
 		"    name: \"Jim\"\n" +
 		"    id: 42\n" +
 		"    email: \"jim@example.com\"\n" +

@@ -1462,7 +1462,7 @@ func printRow(r bigtable.Row, w io.Writer) {
 
 func printRowAtTimezone(r bigtable.Row, w io.Writer, loc *time.Location) {
 	fmt.Fprintln(w, strings.Repeat("-", 40))
-	fmt.Fprintln(w, r.Key())
+	fmt.Fprintf(w, "%q\n", r.Key())
 
 	var fams []string
 	for fam := range r {
@@ -1474,7 +1474,7 @@ func printRowAtTimezone(r bigtable.Row, w io.Writer, loc *time.Location) {
 		sort.Sort(byColumn(ris))
 		for _, ri := range ris {
 			ts := time.UnixMicro(int64(ri.Timestamp))
-			fmt.Fprintf(w, "  %-40s @ %s\n",
+			fmt.Fprintf(w, "  %-40q @ %s\n",
 				ri.Column,
 				ts.In(loc).Format("2006/01/02-15:04:05.000000"))
 			formatted, err :=

@@ -47,6 +47,7 @@ type Config struct {
 	UserAgent         string                           // optional
 	AccessToken       string                           // optional
 	AuthToken         string                           // optional
+	Unauthenticated   bool                             // optional
 	Timeout           time.Duration                    // optional
 	TokenSource       oauth2.TokenSource               // derived
 	TLSCreds          credentials.TransportCredentials // derived
@@ -250,6 +251,8 @@ func (c *Config) SetFromGcloud() error {
 			if c.Creds == "" {
 				log.Printf("-creds flag unset, will use gcloud credential")
 			}
+		} else if c.Creds == "none" {
+			c.Unauthenticated = true
 		} else {
 			os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", c.Creds)
 		}
@@ -282,7 +285,7 @@ func (c *Config) SetFromGcloud() error {
 		c.Project = gcloudConfig.Configuration.Properties.Core.Project
 	}
 
-	if c.AccessToken == "" && c.Creds == "" {
+	if c.AccessToken == "" && c.Creds == "" && !c.Unauthenticated {
 		c.TokenSource = oauth2.ReuseTokenSource(
 			gcloudConfig.Credential.Token(),
 			&GcloudCmdTokenSource{Command: gcloudCmd, Args: gcloudCmdArgs})

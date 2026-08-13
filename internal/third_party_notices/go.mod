@@ -1,5 +1,5 @@
 module cloud.google.com/go/cbt/internal/third_party_notices
 
-go 1.24.5
+go 1.25.0
 
-require golang.org/x/mod v0.27.0
+require golang.org/x/mod v0.40.0

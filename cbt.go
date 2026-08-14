@@ -2112,7 +2112,7 @@ func doSampleRowKeys(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("Could not sample row keys: %v", err)
 	}
-	for k := range keys {
+	for _, k := range keys {
 		fmt.Println(k)
 	}
 }

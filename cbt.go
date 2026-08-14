@@ -870,9 +870,18 @@ var commands = []struct {
 		Name: "sql",
 		Desc: "Execute a SQL query on an Instance",
 		do:   doSql,
-		Usage: "cbt sql <QUERY>\n\n" +
-			"See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
-			"Note that this does not support parameterized queries.\n",
+		Usage: "cbt sql <QUERY> [args ...]\n\n" +
+			"  table-format=<true|false>                Whether to return the results in a table format (Default: true)\n\n" +
+			"    Examples:\n" +
+			"        cbt sql 'SELECT cell_data[\"os_build\"] as os_build, cell_data[\"os_name\"] as os_name FROM mobile-time-series LIMIT 10'\n" +
+			"        cbt sql 'SELECT FORMAT(\"%s,%s,%s\",\n" +
+			"                           SAFE_CONVERT_BYTES_TO_STRING(cell_data[\"os_build\"]),\n" +
+			"                           SAFE_CONVERT_BYTES_TO_STRING(cell_data[\"os_name\"]),\n" +
+			"                           SAFE_CONVERT_BYTES_TO_STRING(cell_data[\"os_version\"])\n" +
+			"                        ) AS osBuild_osName_osVersion\n" +
+			"                 FROM mobile-time-series' table-format=false\n\n" +
+			"    See https://cloud.google.com/bigtable/docs/reference/sql/googlesql-reference-overview for more information.\n" +
+			"    Note that this does not support parameterized queries.\n",
 		Required: ProjectAndInstanceRequired,
 	},
 }
@@ -2057,8 +2066,8 @@ func getFormattedValue(row bigtable.ResultRow, index int) (string, error) {
 }
 
 func doSql(ctx context.Context, args ...string) {
-	if len(args) != 1 {
-		log.Fatalf("usage: cbt sql <QUERY>")
+	if len(args) < 1 {
+		log.Fatalf("usage: cbt sql <QUERY> [args ...]")
 	}
 	query := args[0]
 
@@ -2071,6 +2080,17 @@ func doSql(ctx context.Context, args ...string) {
 	if err != nil {
 		log.Fatalf("While binding statement: %v", err)
 	}
+	parsed, err := parseArgs(args[1:], []string{"table-format"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	tableFormat := true
+	if tableFormatStr := parsed["table-format"]; tableFormatStr != "" {
+		tableFormat, err = strconv.ParseBool(tableFormatStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// Execute the query, writing the result into the table util.
 	table := tablewriter.NewWriter(os.Stdout)
@@ -2079,13 +2099,24 @@ func doSql(ctx context.Context, args ...string) {
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAutoWrapText(false)
 
+	var headerSeen bool
 	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
-		// Okay to output the header multiple times, only the first one has an effect.
 		hs := make([]string, len(row.Metadata.Columns))
-		for i := 0; i < len(row.Metadata.Columns); i++ {
-			hs[i] = row.Metadata.Columns[i].Name
+		if !headerSeen {
+			for i := 0; i < len(row.Metadata.Columns); i++ {
+				hs[i] = row.Metadata.Columns[i].Name
+				if !tableFormat {
+					fmt.Print(hs[i])
+				}
+			}
 		}
-		table.SetHeader(hs)
+		if !headerSeen {
+			table.SetHeader(hs)
+			if !tableFormat {
+				fmt.Print("\n")
+			}
+			headerSeen = true
+		}
 
 		// Write out all values in the table.
 		vs := make([]string, len(row.Metadata.Columns))
@@ -2095,11 +2126,19 @@ func doSql(ctx context.Context, args ...string) {
 				log.Fatalf("Could not get formatted value for column %v: %v", row.Metadata.Columns[i], err)
 			}
 			vs[i] = v
+			if !tableFormat {
+				fmt.Print(v)
+			}
 		}
 		table.Append(vs)
+		if !tableFormat {
+			fmt.Print("\n")
+		}
 		return true
 	})
-	table.Render()
+	if tableFormat {
+		table.Render()
+	}
 }
 
 func doSampleRowKeys(ctx context.Context, args ...string) {

@@ -263,7 +263,7 @@ func TestCsvImporterArgs(t *testing.T) {
 			got.fam != tc.out.fam ||
 			got.sz != tc.out.sz ||
 			got.workers != tc.out.workers {
-			t.Errorf("parseImportArgs(%q) did not fail, out: %q", tc.in, got)
+			t.Errorf("parseImportArgs(%q) did not fail, out: %+v", tc.in, got)
 		}
 	}
 }

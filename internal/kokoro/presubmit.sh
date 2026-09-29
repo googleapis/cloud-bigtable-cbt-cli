@@ -27,6 +27,9 @@ git config --global --add safe.directory "$(pwd)/./.git"
 
 go version
 
+# Make sure go-junit-report is installed
+go install github.com/jstemmer/go-junit-report/v2@latest
+
 export CBT_HOME=$KOKORO_ARTIFACTS_DIR/cloud-bigtable-cbt-cli/
 export PATH="$GOPATH/bin:$PATH"
 export GO111MODULE=on

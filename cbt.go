@@ -1393,10 +1393,7 @@ func doLookup(ctx context.Context, args ...string) {
 		filters = append(filters, bigtable.LatestNFilter(n))
 	}
 	if columns := parsed["columns"]; columns != "" {
-		columnFilters, err := parseColumnsFilter(columns)
-		if err != nil {
-			log.Fatal(err)
-		}
+		columnFilters := parseColumnsFilter(columns)
 		filters = append(filters, columnFilters)
 	}
 
@@ -1636,10 +1633,7 @@ func doRead(ctx context.Context, args ...string) {
 		filters = append(filters, bigtable.RowKeyFilter(regex))
 	}
 	if columns := parsed["columns"]; columns != "" {
-		columnFilters, err := parseColumnsFilter(columns)
-		if err != nil {
-			log.Fatal(err)
-		}
+		columnFilters := parseColumnsFilter(columns)
 		filters = append(filters, columnFilters)
 	}
 	var keysOnly bool
@@ -1761,10 +1755,7 @@ func doCheckAndMutate(ctx context.Context, args ...string) {
 	// Parse the lookup test.
 	filter := bigtable.LatestNFilter(1)
 	if arg, ok := parsed["columns"]; ok {
-		var err error
-		if filter, err = parseColumnsFilter(arg); err != nil {
-			log.Fatalf("While parsing columns=...: %v", err)
-		}
+		filter = parseColumnsFilter(arg)
 	}
 
 	// Parse mutations.
@@ -2680,44 +2671,35 @@ func stringInSlice(s string, list []string) bool {
 	return false
 }
 
-func parseColumnsFilter(columns string) (bigtable.Filter, error) {
+func parseColumnsFilter(columns string) bigtable.Filter {
 	splitColumns := strings.FieldsFunc(columns, func(c rune) bool { return c == ',' })
 	if len(splitColumns) == 1 {
-		filter, err := columnFilter(splitColumns[0])
-		if err != nil {
-			return nil, err
-		}
-		return filter, nil
+		filter := columnFilter(splitColumns[0])
+		return filter
 	}
 
 	var columnFilters []bigtable.Filter
 	for _, column := range splitColumns {
-		filter, err := columnFilter(column)
-		if err != nil {
-			return nil, err
-		}
+		filter := columnFilter(column)
 		columnFilters = append(columnFilters, filter)
 	}
-	return bigtable.InterleaveFilters(columnFilters...), nil
+	return bigtable.InterleaveFilters(columnFilters...)
 }
 
-func columnFilter(column string) (bigtable.Filter, error) {
-	splitColumn := strings.Split(column, ":")
+func columnFilter(column string) bigtable.Filter {
+	splitColumn := strings.SplitN(column, ":", 2)
 	if len(splitColumn) == 1 {
-		return bigtable.ColumnFilter(splitColumn[0]), nil
-	} else if len(splitColumn) == 2 {
-		if strings.HasSuffix(column, ":") {
-			return bigtable.FamilyFilter(splitColumn[0]), nil
-		} else if strings.HasPrefix(column, ":") {
-			return bigtable.ColumnFilter(splitColumn[1]), nil
-		} else {
-			familyFilter := bigtable.FamilyFilter(splitColumn[0])
-			qualifierFilter := bigtable.ColumnFilter(splitColumn[1])
-			return bigtable.ChainFilters(familyFilter, qualifierFilter), nil
-		}
-	} else {
-		return nil, fmt.Errorf("bad format for column %q", column)
+		return bigtable.ColumnFilter(splitColumn[0])
 	}
+
+	family, qualifier := splitColumn[0], splitColumn[1]
+	if family == "" {
+		return bigtable.ColumnFilter(qualifier)
+	}
+	if qualifier == "" {
+		return bigtable.FamilyFilter(family)
+	}
+	return bigtable.ChainFilters(bigtable.FamilyFilter(family), bigtable.ColumnFilter(qualifier))
 }
 
 func parseProfileRoute(str string) (routingPolicy, clusterID string, err error) {

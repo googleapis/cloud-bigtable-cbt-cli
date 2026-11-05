@@ -5,13 +5,14 @@ go 1.26.0
 require (
 	cloud.google.com/go/bigtable v1.58.0
 	github.com/google/go-cmp v0.7.0
-	github.com/jhump/protoreflect v1.17.0
+	github.com/jhump/protoreflect v1.17.1-0.20240913204751-8f5fd1dcb3c5
+	github.com/jhump/protoreflect/v2 v2.0.0
 	github.com/olekukonko/tablewriter v0.0.5
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.47.0
 	google.golang.org/api v0.287.1
 	google.golang.org/grpc v1.83.2
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
 )
 

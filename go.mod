@@ -32,7 +32,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94 // indirect
+	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
 

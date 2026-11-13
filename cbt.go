@@ -130,6 +130,7 @@ func getInstanceAdminClient() *bigtable.InstanceAdminClient {
 		if ep := config.AdminEndpoint; ep != "" {
 			opts = append(opts, option.WithEndpoint(ep))
 		}
+		opts = append(opts, option.WithUserAgent(cliUserAgent))
 		opts = getCredentialOpts(opts)
 		var err error
 		instanceAdminClient, err = bigtable.NewInstanceAdminClient(context.Background(), config.Project, opts...)

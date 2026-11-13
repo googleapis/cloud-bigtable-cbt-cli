@@ -42,7 +42,6 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"cloud.google.com/go/civil"
-	"github.com/olekukonko/tablewriter"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -1280,7 +1279,7 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go sql.go -o cbtdoc.go doc
 
 /*
 ` + docIntroTemplate + `
@@ -2060,46 +2059,9 @@ func doSql(ctx context.Context, args ...string) {
 	if len(args) != 1 {
 		log.Fatalf("usage: cbt sql <QUERY>")
 	}
-	query := args[0]
-
-	// Prepare and bind the statement.
-	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)
-	if err != nil {
-		log.Fatalf("While preparing statement: %v", err)
+	if err := runSQL(ctx, clientSQLRowExecutor{client: getClient(bigtable.ClientConfig{})}, os.Stdout, args[0]); err != nil {
+		log.Fatalf("%v", err)
 	}
-	boundStmt, err := stmt.Bind(nil)
-	if err != nil {
-		log.Fatalf("While binding statement: %v", err)
-	}
-
-	// Execute the query, writing the result into the table util.
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAutoWrapText(false)
-
-	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
-		// Okay to output the header multiple times, only the first one has an effect.
-		hs := make([]string, len(row.Metadata.Columns))
-		for i := 0; i < len(row.Metadata.Columns); i++ {
-			hs[i] = row.Metadata.Columns[i].Name
-		}
-		table.SetHeader(hs)
-
-		// Write out all values in the table.
-		vs := make([]string, len(row.Metadata.Columns))
-		for i := 0; i < len(row.Metadata.Columns); i++ {
-			v, err := getFormattedValue(row, i)
-			if err != nil {
-				log.Fatalf("Could not get formatted value for column %v: %v", row.Metadata.Columns[i], err)
-			}
-			vs[i] = v
-		}
-		table.Append(vs)
-		return true
-	})
-	table.Render()
 }
 
 func doSampleRowKeys(ctx context.Context, args ...string) {

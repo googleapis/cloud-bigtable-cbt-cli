@@ -468,6 +468,22 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "createfunction",
+		Desc: "Create a user-defined function in the configured instance",
+		do:   doCreateFunction,
+		Usage: "cbt createfunction <function-id> (wasm-file=<path> | body=<sql-expression>) [args=<name>[:<type>][,...]] [return-type=<type>] [deletion-protection=<true|false>]\n\n" +
+			"  function-id             Unique ID for the function ([a-z_][a-z0-9_]*)\n" +
+			"  wasm-file=<path>        Path to the compiled .wasm module for a WASM function (max 10 MiB)\n" +
+			"  body=<sql-expression>   SQL expression body for a SQL scalar function\n" +
+			"  args=<name>[:<type>]    Comma-separated argument definitions (required for wasm-file)\n" +
+			"  return-type=<type>      SQL return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, DATE, or ARRAY<T>; required for wasm-file)\n" +
+			"  deletion-protection     Optional boolean to protect the function against deletion\n\n" +
+			"    Examples:\n" +
+			"      cbt createfunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL\n" +
+			"      cbt createfunction add_one body=\"x + 1\" args=x:INT64 return-type=INT64",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "createinstance",
 		Desc: "Create an instance with an initial cluster",
 		do:   doCreateInstance,
@@ -555,6 +571,14 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "deletefunction",
+		Desc: "Delete a user-defined function from the configured instance",
+		do:   doDeleteFunction,
+		Usage: "cbt deletefunction <function-id> [etag=<etag>]\n\n" +
+			"    Example: cbt deletefunction doc_has_keyword",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "deleteinstance",
 		Desc: "Delete an instance",
 		do:   doDeleteInstance,
@@ -598,6 +622,14 @@ var commands = []struct {
 		Desc:     "Read app profile for an instance",
 		do:       doGetAppProfile,
 		Usage:    "cbt getappprofile <instance-id> <profile-id>",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "getfunction",
+		Desc: "Read metadata for a user-defined function in the configured instance",
+		do:   doGetFunction,
+		Usage: "cbt getfunction <function-id>\n\n" +
+			"    Example: cbt getfunction doc_has_keyword",
 		Required: ProjectAndInstanceRequired,
 	},
 	// {
@@ -659,6 +691,13 @@ var commands = []struct {
 		Desc:     "List clusters in an instance",
 		do:       doListClusters,
 		Usage:    "cbt listclusters",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name:     "listfunctions",
+		Desc:     "List user-defined functions in the configured instance",
+		do:       doListFunctions,
+		Usage:    "cbt listfunctions",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -843,6 +882,16 @@ var commands = []struct {
 			"  cluster-id    Permanent, unique ID for the cluster in the instance\n" +
 			"  num-nodes     The new number of nodes\n\n" +
 			"    Example: cbt updatecluster my-instance-c1 num-nodes=5",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
+		Name: "updatefunction",
+		Desc: "Update a user-defined function in the configured instance",
+		do:   doUpdateFunction,
+		Usage: "cbt updatefunction <function-id> [wasm-file=<path> | body=<sql-expression>] [args=<name>[:<type>],...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]\n\n" +
+			"    Examples:\n" +
+			"      cbt updatefunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL\n" +
+			"      cbt updatefunction add_one body=\"x + 2\" args=x:INT64 return-type=INT64",
 		Required: ProjectAndInstanceRequired,
 	},
 	{
@@ -1280,7 +1329,7 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go functions.go -o cbtdoc.go doc
 
 /*
 ` + docIntroTemplate + `

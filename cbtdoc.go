@@ -14,7 +14,7 @@
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go functions.go -o cbtdoc.go doc
 
 /*
 The `cbt` CLI is a command-line interface that lets you interact with Cloud Bigtable.
@@ -34,6 +34,7 @@ The commands are:
 	createappprofile          Create app profile for an instance
 	createcluster             Create a cluster in the configured instance
 	createfamily              Create a column family
+	createfunction            Create a user-defined function in the configured instance
 	createinstance            Create an instance with an initial cluster
 	createtable               Create a table
 	deleteallrows             Delete all rows
@@ -41,15 +42,18 @@ The commands are:
 	deletecluster             Delete a cluster from the configured instance
 	deletecolumn              Delete all cells in a column
 	deletefamily              Delete a column family
+	deletefunction            Delete a user-defined function from the configured instance
 	deleteinstance            Delete an instance
 	deleterow                 Delete a row
 	deletetable               Delete a table
 	doc                       Print godoc-suitable documentation for cbt
 	getappprofile             Read app profile for an instance
+	getfunction               Read metadata for a user-defined function in the configured instance
 	help                      Print help text
 	import                    Batch write many rows based on the input file
 	listappprofile            Lists app profile for an instance
 	listclusters              List clusters in an instance
+	listfunctions             List user-defined functions in the configured instance
 	listinstances             List instances in a project
 	lookup                    Read from a single row
 	ls                        List tables and column families
@@ -61,6 +65,7 @@ The commands are:
 	setgcpolicy               Set the garbage-collection policy (age, versions) for a column family
 	updateappprofile          Update app profile for an instance
 	updatecluster             Update a cluster in the configured instance
+	updatefunction            Update a user-defined function in the configured instance
 	version                   Print the current cbt version
 	waitforreplication        Block until all the completed writes have been replicated to all the clusters
 
@@ -141,6 +146,23 @@ Usage:
 
 	    Example: cbt createfamily mobile-time-series stats_summary
 
+# Create a user-defined function in the configured instance
+
+Usage:
+
+	cbt createfunction <function-id> (wasm-file=<path> | body=<sql-expression>) [args=<name>[:<type>][,...]] [return-type=<type>] [deletion-protection=<true|false>]
+
+	  function-id             Unique ID for the function ([a-z_][a-z0-9_]*)
+	  wasm-file=<path>        Path to the compiled .wasm module for a WASM function (max 10 MiB)
+	  body=<sql-expression>   SQL expression body for a SQL scalar function
+	  args=<name>[:<type>]    Comma-separated argument definitions (required for wasm-file)
+	  return-type=<type>      SQL return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, DATE, or ARRAY<T>; required for wasm-file)
+	  deletion-protection     Optional boolean to protect the function against deletion
+
+	    Examples:
+	      cbt createfunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
+	      cbt createfunction add_one body="x + 1" args=x:INT64 return-type=INT64
+
 # Create an instance with an initial cluster
 
 Usage:
@@ -210,6 +232,14 @@ Usage:
 
 	    Example: cbt deletefamily mobile-time-series stats_summary
 
+# Delete a user-defined function from the configured instance
+
+Usage:
+
+	cbt deletefunction <function-id> [etag=<etag>]
+
+	    Example: cbt deletefunction doc_has_keyword
+
 # Delete an instance
 
 Usage:
@@ -246,6 +276,14 @@ Usage:
 Usage:
 
 	cbt getappprofile <instance-id> <profile-id>
+
+# Read metadata for a user-defined function in the configured instance
+
+Usage:
+
+	cbt getfunction <function-id>
+
+	    Example: cbt getfunction doc_has_keyword
 
 # Print help text
 
@@ -302,6 +340,12 @@ Usage:
 Usage:
 
 	cbt listclusters
+
+# List user-defined functions in the configured instance
+
+Usage:
+
+	cbt listfunctions
 
 # List instances in a project
 
@@ -442,6 +486,16 @@ Usage:
 	  num-nodes     The new number of nodes
 
 	    Example: cbt updatecluster my-instance-c1 num-nodes=5
+
+# Update a user-defined function in the configured instance
+
+Usage:
+
+	cbt updatefunction <function-id> [wasm-file=<path> | body=<sql-expression>] [args=<name>[:<type>],...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]
+
+	    Examples:
+	      cbt updatefunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
+	      cbt updatefunction add_one body="x + 2" args=x:INT64 return-type=INT64
 
 # Print the current cbt version
 

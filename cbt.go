@@ -82,16 +82,19 @@ func getCredentialOpts(opts []option.ClientOption) []option.ClientOption {
 	return opts
 }
 
+func getClientOpts(endpoint string) []option.ClientOption {
+	var opts []option.ClientOption
+	if endpoint != "" {
+		opts = append(opts, option.WithEndpoint(endpoint))
+	}
+	opts = append(opts, option.WithUserAgent(buildUserAgent(cliUserAgent, config.UserAgent)))
+	return getCredentialOpts(opts)
+}
+
 func getClient(clientConf bigtable.ClientConfig) *bigtable.Client {
 	if client == nil {
-		var opts []option.ClientOption
-		if ep := config.DataEndpoint; ep != "" {
-			opts = append(opts, option.WithEndpoint(ep))
-		}
-		opts = append(opts, option.WithUserAgent(cliUserAgent))
-		opts = getCredentialOpts(opts)
 		var err error
-		client, err = bigtable.NewClientWithConfig(context.Background(), config.Project, config.Instance, clientConf, opts...)
+		client, err = bigtable.NewClientWithConfig(context.Background(), config.Project, config.Instance, clientConf, getClientOpts(config.DataEndpoint)...)
 		if err != nil {
 			log.Fatalf("Making bigtable.Client: %v", err)
 		}
@@ -109,14 +112,8 @@ func getTable(clientConf bigtable.ClientConfig, tableName string) tableLike {
 
 func getAdminClient() *bigtable.AdminClient {
 	if adminClient == nil {
-		var opts []option.ClientOption
-		if ep := config.AdminEndpoint; ep != "" {
-			opts = append(opts, option.WithEndpoint(ep))
-		}
-		opts = append(opts, option.WithUserAgent(cliUserAgent))
-		opts = getCredentialOpts(opts)
 		var err error
-		adminClient, err = bigtable.NewAdminClient(context.Background(), config.Project, config.Instance, opts...)
+		adminClient, err = bigtable.NewAdminClient(context.Background(), config.Project, config.Instance, getClientOpts(config.AdminEndpoint)...)
 		if err != nil {
 			log.Fatalf("Making bigtable.AdminClient: %v", err)
 		}
@@ -126,13 +123,8 @@ func getAdminClient() *bigtable.AdminClient {
 
 func getInstanceAdminClient() *bigtable.InstanceAdminClient {
 	if instanceAdminClient == nil {
-		var opts []option.ClientOption
-		if ep := config.AdminEndpoint; ep != "" {
-			opts = append(opts, option.WithEndpoint(ep))
-		}
-		opts = getCredentialOpts(opts)
 		var err error
-		instanceAdminClient, err = bigtable.NewInstanceAdminClient(context.Background(), config.Project, opts...)
+		instanceAdminClient, err = bigtable.NewInstanceAdminClient(context.Background(), config.Project, getClientOpts(config.AdminEndpoint)...)
 		if err != nil {
 			log.Fatalf("Making bigtable.InstanceAdminClient: %v", err)
 		}
@@ -172,10 +164,6 @@ func main() {
 }
 
 func doMain(config *Config, args []string) {
-	if config.UserAgent != "" {
-		cliUserAgent = config.UserAgent
-	}
-
 	var ctx context.Context
 	if config.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -1280,7 +1268,7 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go agents.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
 
 /*
 ` + docIntroTemplate + `

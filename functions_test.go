@@ -43,6 +43,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 var fastTestBackoff = gax.Backoff{
@@ -63,12 +64,14 @@ type fakeFunctionAdminServer struct {
 	mu         sync.Mutex
 	calls      []recordedAdminCall
 	createReqs []*btapb.CreateFunctionRequest
+	updateReqs []*btapb.UpdateFunctionRequest
 	getReqs    []*btapb.GetFunctionRequest
 	listReqs   []*btapb.ListFunctionsRequest
 	deleteReqs []*btapb.DeleteFunctionRequest
 	getOpReqs  []*longrunningpb.GetOperationRequest
 
 	createFn func(context.Context, *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error)
+	updateFn func(context.Context, *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error)
 	getFn    func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
 	listFn   func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 	deleteFn func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
@@ -111,6 +114,19 @@ func (s *fakeFunctionAdminServer) CreateFunction(ctx context.Context, req *btapb
 		return fn(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "unexpected CreateFunction")
+}
+
+func (s *fakeFunctionAdminServer) UpdateFunction(ctx context.Context, req *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+	s.record(ctx, "UpdateFunction")
+	cloned := proto.Clone(req).(*btapb.UpdateFunctionRequest)
+	s.mu.Lock()
+	s.updateReqs = append(s.updateReqs, cloned)
+	fn := s.updateFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "unexpected UpdateFunction")
 }
 
 func (s *fakeFunctionAdminServer) GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
@@ -1418,6 +1434,341 @@ func TestRunListFunctions_PaginationHeadersAndSQLTypes(t *testing.T) {
 	}
 }
 
+// UT-2 & UT-7c: Client-side updatefunction boundary rejections, empty options, and empty update masks must fail fast with zero outbound gRPC calls.
+func TestRunUpdateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	oversizedWASM := writeTempWASMFile(t, bytes.Repeat([]byte{0x01}, maxWASMSourceBytes+1))
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantSub string
+	}{
+		{
+			name:    "update_no_options",
+			args:    []string{"doc_fn"},
+			wantSub: "usage: cbt updatefunction",
+		},
+		{
+			name:    "update_invalid_function_id",
+			args:    []string{"BadFunc", "deletion-protection=true"},
+			wantSub: "invalid function-id",
+		},
+		{
+			name:    "update_empty_args_value",
+			args:    []string{"my_fn", "args="},
+			wantSub: "option \"args\" must not be empty",
+		},
+		{
+			name:    "update_oversized_wasm_file",
+			args:    []string{"my_fn", "wasm-file=" + oversizedWASM},
+			wantSub: "exceeds maximum allowed size",
+		},
+		{
+			name:    "update_invalid_deletion_protection_bool",
+			args:    []string{"my_fn", "deletion-protection=not-a-bool"},
+			wantSub: "parsing deletion-protection",
+		},
+		{
+			name:    "update_args_without_wasm_file_rejected",
+			args:    []string{"my_fn", "args=x:INT64"},
+			wantSub: "requires specifying \"wasm-file\"",
+		},
+		{
+			name:    "update_return_type_without_wasm_file_rejected",
+			args:    []string{"my_fn", "return-type=INT64"},
+			wantSub: "requires specifying \"wasm-file\"",
+		},
+		{
+			name:    "update_body_option_rejected",
+			args:    []string{"doc_fn", "deletion-protection=true", "body=1 + 1"},
+			wantSub: "unknown arg key",
+		},
+		{
+			name:    "update_only_etag_has_empty_mask",
+			args:    []string{"doc_fn", "etag=W/\"v1\""},
+			wantSub: "nothing to update",
+		},
+		{
+			name:    "update_empty_etag_rejected",
+			args:    []string{"doc_fn", "deletion-protection=true", "etag="},
+			wantSub: "option \"etag\" must not be empty",
+		},
+		{
+			name:    "update_empty_wasm_file_rejected",
+			args:    []string{"doc_fn", "wasm-file="},
+			wantSub: "option \"wasm-file\" must not be empty",
+		},
+		{
+			name:    "update_empty_return_type_rejected",
+			args:    []string{"doc_fn", "return-type="},
+			wantSub: "option \"return-type\" must not be empty",
+		},
+		{
+			name:    "update_empty_deletion_protection_rejected",
+			args:    []string{"doc_fn", "deletion-protection="},
+			wantSub: "option \"deletion-protection\" must not be empty",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			beforeCalls := srv.totalCalls()
+			var out bytes.Buffer
+			err := runUpdateFunction(t.Context(), api, "proj", "inst", &out, tc.args...)
+			if err == nil {
+				t.Fatalf("runUpdateFunction(%v) succeeded with output %q, want error containing %q", tc.args, out.String(), tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("runUpdateFunction(%v) error = %q, want substring %q", tc.args, err.Error(), tc.wantSub)
+			}
+			if out.Len() != 0 {
+				t.Errorf("runUpdateFunction(%v) output = %q, want empty output on error", tc.args, out.String())
+			}
+			if gotCalls := srv.totalCalls() - beforeCalls; gotCalls != 0 {
+				t.Errorf("runUpdateFunction(%v) outbound gRPC calls = %d, want 0", tc.args, gotCalls)
+			}
+		})
+	}
+}
+
+// UT-4: Verify immediate gRPC errors and terminal LRO Operation_Error propagation on UpdateFunction.
+func TestRunUpdateFunction_ImmediateAndLROErrorPropagation(t *testing.T) {
+	tests := []struct {
+		name      string
+		rpcErr    error
+		initialOp *longrunningpb.Operation
+		polledOp  *longrunningpb.Operation
+		wantCode  codes.Code
+		wantSub   string
+	}{
+		{
+			name:     "update_immediate_permission_denied",
+			rpcErr:   status.Error(codes.PermissionDenied, "caller lacks bigtable.functions.update"),
+			wantCode: codes.PermissionDenied,
+			wantSub:  "caller lacks bigtable.functions.update",
+		},
+		{
+			name:      "update_lro_rollback_failure",
+			initialOp: &longrunningpb.Operation{Name: "operations/op-upd", Done: false},
+			polledOp: &longrunningpb.Operation{
+				Name: "operations/op-upd",
+				Done: true,
+				Result: &longrunningpb.Operation_Error{
+					Error: &statuspb.Status{
+						Code:    int32(codes.Internal),
+						Message: "zonal module rollback failed",
+					},
+				},
+			},
+			wantCode: codes.Internal,
+			wantSub:  "zonal module rollback failed",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := &fakeFunctionAdminServer{
+				updateFn: func(_ context.Context, _ *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+					return tc.initialOp, tc.rpcErr
+				},
+				getOpFn: func(_ context.Context, _ *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+					return tc.polledOp, nil
+				},
+			}
+			api := startFakeFunctionAdminGRPC(t, srv)
+
+			var out bytes.Buffer
+			err := runUpdateFunction(t.Context(), api, "proj", "inst", &out, "doc_fn", "deletion-protection=true")
+			if err == nil {
+				t.Fatalf("got nil error with output %q, want code %v", out.String(), tc.wantCode)
+			}
+			if gotCode := status.Code(err); gotCode != tc.wantCode {
+				t.Errorf("status.Code(err) = %v, want %v (err: %v)", gotCode, tc.wantCode, err)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("error = %q, want substring %q", err.Error(), tc.wantSub)
+			}
+			if out.Len() != 0 {
+				t.Errorf("output = %q, want empty output on error", out.String())
+			}
+		})
+	}
+}
+
+// UT-5b: Verify UpdateFunction LRO polling does not leak function.name= into GetOperation metadata.
+func TestWaitFunctionOperation_UpdateDoesNotLeakFunctionNameHeader(t *testing.T) {
+	fnProto := &btapb.Function{Name: "projects/p/instances/i/functions/upd_fn"}
+	opName := "operations/upd-op-1"
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, _ *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return &longrunningpb.Operation{Name: opName, Done: false}, nil
+		},
+		getOpFn: func(_ context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, req.GetName(), fnProto), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	if err := runUpdateFunction(t.Context(), api, "p", "i", &out, "upd_fn", "deletion-protection=true"); err != nil {
+		t.Fatalf("runUpdateFunction unexpected error: %v", err)
+	}
+	pollCalls := srv.callsFor("GetOperation")
+	if len(pollCalls) != 1 {
+		t.Fatalf("GetOperation call count = %d, want 1", len(pollCalls))
+	}
+	wantParams := []string{"name=" + url.QueryEscape(opName)}
+	if diff := cmp.Diff(wantParams, pollCalls[0].md.Get(xGoogRequestParamsHeader)); diff != "" {
+		t.Errorf("GetOperation x-goog-request-params mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// UT-6: Verify updatefunction partial source-only FieldMask, routing headers, and LRO polling.
+func TestRunUpdateFunction_PartialSourceOnlyUpdate(t *testing.T) {
+	wasmBytes := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00}
+	wasmPath := writeTempWASMFile(t, wasmBytes)
+	fnName := "projects/my-proj/instances/my-inst/functions/doc_extract_snippet"
+
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, _ *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return &longrunningpb.Operation{Name: "operations/op-src", Done: false}, nil
+		},
+		getOpFn: func(_ context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, req.GetName(), &btapb.Function{
+				Name: fnName,
+				FunctionType: &btapb.Function_WasmFunction_{
+					WasmFunction: &btapb.Function_WasmFunction{
+						Arguments:  []*btapb.Function_Argument{{Name: "doc", DataType: &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}}}},
+						ReturnType: &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}},
+					},
+				},
+			}), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	err := runUpdateFunction(t.Context(), api, "my-proj", "my-inst", &out,
+		"doc_extract_snippet", "wasm-file="+wasmPath)
+	if err != nil {
+		t.Fatalf("runUpdateFunction unexpected error: %v", err)
+	}
+	wantReq := &btapb.UpdateFunctionRequest{
+		Function: &btapb.Function{
+			Name: fnName,
+			FunctionType: &btapb.Function_WasmFunction_{
+				WasmFunction: &btapb.Function_WasmFunction{Source: wasmBytes},
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"wasm_function.source"}},
+	}
+	if diff := cmp.Diff(wantReq, srv.updateReqs[0], protocmp.Transform()); diff != "" {
+		t.Errorf("UpdateFunctionRequest mismatch (-want +got):\n%s", diff)
+	}
+	updCalls := srv.callsFor("UpdateFunction")
+	wantParams := []string{"function.name=" + url.QueryEscape(fnName)}
+	if diff := cmp.Diff(wantParams, updCalls[0].md.Get(xGoogRequestParamsHeader)); diff != "" {
+		t.Errorf("UpdateFunction x-goog-request-params mismatch (-want +got):\n%s", diff)
+	}
+	wantOut := "Name: " + fnName + "\nSignature: (doc:STRING) -> STRING\n"
+	if out.String() != wantOut {
+		t.Errorf("runUpdateFunction output = %q, want %q", out.String(), wantOut)
+	}
+}
+
+// UT-7a: Verify deletion-protection=false with weak base64 etag updates top-level field without allocating WasmFunction.
+func TestRunUpdateFunction_DeletionProtectionFalseWithEtagLeavesWASMNil(t *testing.T) {
+	fnName := "projects/my-proj/instances/my-inst/functions/doc_extract_snippet"
+	weakEtag := `W/"/v1/etag=YWJjZA=="`
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, _ *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/op-dp", &btapb.Function{
+				Name:               fnName,
+				DeletionProtection: false,
+				FunctionType: &btapb.Function_SqlScalarFunction_{
+					SqlScalarFunction: &btapb.Function_SqlScalarFunction{FunctionBody: "1 + 1"},
+				},
+			}), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	err := runUpdateFunction(t.Context(), api, "my-proj", "my-inst", &out,
+		"doc_extract_snippet", "deletion-protection=false", "etag="+weakEtag)
+	if err != nil {
+		t.Fatalf("runUpdateFunction unexpected error: %v", err)
+	}
+	gotReq := srv.updateReqs[0]
+	if gotReq.GetFunction().GetFunctionType() != nil {
+		t.Errorf("UpdateFunctionRequest.Function.FunctionType = %T, want nil when updating only deletion_protection", gotReq.GetFunction().GetFunctionType())
+	}
+	wantReq := &btapb.UpdateFunctionRequest{
+		Function: &btapb.Function{
+			Name:               fnName,
+			DeletionProtection: false,
+			Etag:               weakEtag,
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"deletion_protection"}},
+	}
+	if diff := cmp.Diff(wantReq, gotReq, protocmp.Transform()); diff != "" {
+		t.Errorf("UpdateFunctionRequest mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// UT-6 & UT-7b: Verify full FieldMask path ordering and etag forwarding on updatefunction.
+func TestRunUpdateFunction_AllFieldsUpdateMaskOrderAndValues(t *testing.T) {
+	wasmBytes := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00}
+	wasmPath := writeTempWASMFile(t, wasmBytes)
+
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, req *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/op-all", req.GetFunction()), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	err := runUpdateFunction(t.Context(), api, "my-proj", "my-inst", &out,
+		"doc_extract_snippet",
+		"wasm-file="+wasmPath,
+		"args=x:INT64",
+		"return-type=STRING",
+		"deletion-protection=true",
+		"etag=YWJjZA==",
+	)
+	if err != nil {
+		t.Fatalf("runUpdateFunction unexpected error: %v", err)
+	}
+	wantMask := []string{
+		"wasm_function.source",
+		"wasm_function.arguments",
+		"wasm_function.return_type",
+		"deletion_protection",
+	}
+	if diff := cmp.Diff(wantMask, srv.updateReqs[0].GetUpdateMask().GetPaths()); diff != "" {
+		t.Errorf("UpdateMask.Paths mismatch (-want +got):\n%s", diff)
+	}
+	wantFn := &btapb.Function{
+		Name:               "projects/my-proj/instances/my-inst/functions/doc_extract_snippet",
+		Etag:               "YWJjZA==",
+		DeletionProtection: true,
+		FunctionType: &btapb.Function_WasmFunction_{
+			WasmFunction: &btapb.Function_WasmFunction{
+				Source:     wasmBytes,
+				Arguments:  []*btapb.Function_Argument{{Name: "x", DataType: &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}}},
+				ReturnType: &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}},
+			},
+		},
+	}
+	if diff := cmp.Diff(wantFn, srv.updateReqs[0].GetFunction(), protocmp.Transform()); diff != "" {
+		t.Errorf("UpdateFunctionRequest.Function mismatch (-want +got):\n%s", diff)
+	}
+}
+
 // Verify deletefunction argument, identifier, and option rejections fail fast with zero outbound gRPC calls.
 func TestRunDeleteFunction_ValidationErrors_ZeroRPCs(t *testing.T) {
 	srv := &fakeFunctionAdminServer{}
@@ -1545,6 +1896,7 @@ var allFunctionCommandNames = []string{
 	"deletefunction",
 	"getfunction",
 	"listfunctions",
+	"updatefunction",
 }
 
 // UT-13a: Verify ProjectAndInstanceRequired CheckFlags enforcement for Function Admin commands.

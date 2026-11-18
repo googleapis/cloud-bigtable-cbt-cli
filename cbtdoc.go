@@ -65,6 +65,7 @@ The commands are:
 	setgcpolicy               Set the garbage-collection policy (age, versions) for a column family
 	updateappprofile          Update app profile for an instance
 	updatecluster             Update a cluster in the configured instance
+	updatefunction            Update a user-defined function in the configured instance
 	version                   Print the current cbt version
 	waitforreplication        Block until all the completed writes have been replicated to all the clusters
 
@@ -485,6 +486,15 @@ Usage:
 	  num-nodes     The new number of nodes
 
 	    Example: cbt updatecluster my-instance-c1 num-nodes=5
+
+# Update a user-defined function in the configured instance
+
+Usage:
+
+	cbt updatefunction <function-id> [wasm-file=<path>] [args=<name>:<type>,...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]
+
+	    Example:
+	      cbt updatefunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
 
 # Print the current cbt version
 

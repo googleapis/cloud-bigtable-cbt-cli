@@ -555,6 +555,14 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "deletefunction",
+		Desc: "Delete a user-defined function from the configured instance",
+		do:   doDeleteFunction,
+		Usage: "cbt deletefunction <function-id> [etag=<etag>]\n\n" +
+			"    Example: cbt deletefunction doc_has_keyword",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "deleteinstance",
 		Desc: "Delete an instance",
 		do:   doDeleteInstance,

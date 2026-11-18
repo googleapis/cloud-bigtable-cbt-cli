@@ -1439,6 +1439,7 @@ func TestRunUpdateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
 	srv := &fakeFunctionAdminServer{}
 	api := startFakeFunctionAdminGRPC(t, srv)
 
+	validWASM := writeTempWASMFile(t, []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00})
 	oversizedWASM := writeTempWASMFile(t, bytes.Repeat([]byte{0x01}, maxWASMSourceBytes+1))
 
 	tests := []struct {
@@ -1457,6 +1458,11 @@ func TestRunUpdateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
 			wantSub: "invalid function-id",
 		},
 		{
+			name:    "update_both_wasm_file_and_body_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "body=1 + 1"},
+			wantSub: "cannot specify both \"wasm-file\" and \"body\"",
+		},
+		{
 			name:    "update_empty_args_value",
 			args:    []string{"my_fn", "args="},
 			wantSub: "option \"args\" must not be empty",
@@ -1472,19 +1478,14 @@ func TestRunUpdateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
 			wantSub: "parsing deletion-protection",
 		},
 		{
-			name:    "update_args_without_wasm_file_rejected",
+			name:    "update_args_without_wasm_file_or_body_rejected",
 			args:    []string{"my_fn", "args=x:INT64"},
-			wantSub: "requires specifying \"wasm-file\"",
+			wantSub: "requires specifying \"wasm-file\" or \"body\"",
 		},
 		{
-			name:    "update_return_type_without_wasm_file_rejected",
+			name:    "update_return_type_without_wasm_file_or_body_rejected",
 			args:    []string{"my_fn", "return-type=INT64"},
-			wantSub: "requires specifying \"wasm-file\"",
-		},
-		{
-			name:    "update_body_option_rejected",
-			args:    []string{"doc_fn", "deletion-protection=true", "body=1 + 1"},
-			wantSub: "unknown arg key",
+			wantSub: "requires specifying \"wasm-file\" or \"body\"",
 		},
 		{
 			name:    "update_only_etag_has_empty_mask",
@@ -1531,6 +1532,85 @@ func TestRunUpdateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
 				t.Errorf("runUpdateFunction(%v) outbound gRPC calls = %d, want 0", tc.args, gotCalls)
 			}
 		})
+	}
+}
+
+func TestRunUpdateFunction_SQLScalarFunction(t *testing.T) {
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, req *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/op-sql-update", req.GetFunction()), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var updateOut bytes.Buffer
+	err := runUpdateFunction(
+		t.Context(),
+		api,
+		"my-proj",
+		"my-inst",
+		&updateOut,
+		"add_days",
+		"body=DATE_SUB(d, INTERVAL delta DAY)",
+		"args=d:DATE,delta:INT64",
+		"return-type=DATE",
+		"deletion-protection=true",
+	)
+	if err != nil {
+		t.Fatalf("runUpdateFunction(SQL) unexpected error: %v", err)
+	}
+	wantUpdateMask := []string{
+		"sql_scalar_function.function_body",
+		"sql_scalar_function.arguments",
+		"sql_scalar_function.return_type",
+		"deletion_protection",
+	}
+	if diff := cmp.Diff(wantUpdateMask, srv.updateReqs[0].GetUpdateMask().GetPaths()); diff != "" {
+		t.Errorf("UpdateFunction(SQL) UpdateMask.Paths mismatch (-want +got):\n%s", diff)
+	}
+	wantFn := &btapb.Function{
+		Name:               "projects/my-proj/instances/my-inst/functions/add_days",
+		DeletionProtection: true,
+		FunctionType: &btapb.Function_SqlScalarFunction_{
+			SqlScalarFunction: &btapb.Function_SqlScalarFunction{
+				FunctionBody: "DATE_SUB(d, INTERVAL delta DAY)",
+				Arguments: []*btapb.Function_Argument{
+					{Name: "d", DataType: &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}}},
+					{Name: "delta", DataType: &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}},
+				},
+				ReturnType: &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}},
+			},
+		},
+	}
+	if diff := cmp.Diff(wantFn, srv.updateReqs[0].GetFunction(), protocmp.Transform()); diff != "" {
+		t.Errorf("UpdateFunction(SQL) Function mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// Verify return-type=ANY on update sends the return-type mask path with no type,
+// which clears the stored return type.
+func TestRunUpdateFunction_SQLReturnTypeAnyClearsType(t *testing.T) {
+	srv := &fakeFunctionAdminServer{
+		updateFn: func(_ context.Context, req *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/op-sql-any", req.GetFunction()), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	if err := runUpdateFunction(t.Context(), api, "my-proj", "my-inst", io.Discard, "add_days", "body=x + 1", "return-type=ANY"); err != nil {
+		t.Fatalf("runUpdateFunction unexpected error: %v", err)
+	}
+	wantReq := &btapb.UpdateFunctionRequest{
+		Function: &btapb.Function{
+			Name: "projects/my-proj/instances/my-inst/functions/add_days",
+			FunctionType: &btapb.Function_SqlScalarFunction_{
+				SqlScalarFunction: &btapb.Function_SqlScalarFunction{FunctionBody: "x + 1"},
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"sql_scalar_function.function_body", "sql_scalar_function.return_type"}},
+	}
+	if diff := cmp.Diff(wantReq, srv.updateReqs[0], protocmp.Transform()); diff != "" {
+		t.Errorf("UpdateFunctionRequest mismatch (-want +got):\n%s", diff)
 	}
 }
 

@@ -33,6 +33,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type recordedAdminCall struct {
@@ -43,13 +45,15 @@ type recordedAdminCall struct {
 type fakeFunctionAdminServer struct {
 	btapb.UnimplementedBigtableInstanceAdminServer
 
-	mu       sync.Mutex
-	calls    []recordedAdminCall
-	getReqs  []*btapb.GetFunctionRequest
-	listReqs []*btapb.ListFunctionsRequest
+	mu         sync.Mutex
+	calls      []recordedAdminCall
+	getReqs    []*btapb.GetFunctionRequest
+	listReqs   []*btapb.ListFunctionsRequest
+	deleteReqs []*btapb.DeleteFunctionRequest
 
-	getFn  func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
-	listFn func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
+	getFn    func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
+	listFn   func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
+	deleteFn func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
 }
 
 func (s *fakeFunctionAdminServer) record(ctx context.Context, method string) {
@@ -101,6 +105,19 @@ func (s *fakeFunctionAdminServer) ListFunctions(ctx context.Context, req *btapb.
 		return fn(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "unexpected ListFunctions")
+}
+
+func (s *fakeFunctionAdminServer) DeleteFunction(ctx context.Context, req *btapb.DeleteFunctionRequest) (*emptypb.Empty, error) {
+	s.record(ctx, "DeleteFunction")
+	cloned := proto.Clone(req).(*btapb.DeleteFunctionRequest)
+	s.mu.Lock()
+	s.deleteReqs = append(s.deleteReqs, cloned)
+	fn := s.deleteFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grpcFunctionAdminClient {
@@ -515,7 +532,130 @@ func TestRunListFunctions_PaginationHeadersAndSQLTypes(t *testing.T) {
 	}
 }
 
+// Verify deletefunction argument, identifier, and option rejections fail fast with zero outbound gRPC calls.
+func TestRunDeleteFunction_ValidationErrors_ZeroRPCs(t *testing.T) {
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	errCases := []struct {
+		name    string
+		args    []string
+		wantSub string
+	}{
+		{
+			name:    "delete_no_args_rejected",
+			args:    nil,
+			wantSub: "usage: cbt deletefunction",
+		},
+		{
+			name:    "delete_invalid_function_id_rejected",
+			args:    []string{"BadFunc"},
+			wantSub: "invalid function-id",
+		},
+		{
+			name:    "delete_overlong_function_id_rejected",
+			args:    []string{strings.Repeat("f", maxFunctionIdentifierLen+1)},
+			wantSub: "exceeds maximum length",
+		},
+		{
+			name:    "delete_empty_etag_rejected",
+			args:    []string{"doc_fn", "etag="},
+			wantSub: "option \"etag\" must not be empty",
+		},
+		{
+			name:    "delete_unexpected_option_rejected",
+			args:    []string{"doc_fn", "unknown=1"},
+			wantSub: "unknown arg key",
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			before := srv.totalCalls()
+			err := runDeleteFunction(t.Context(), api, "p", "i", tc.args...)
+			if err == nil {
+				t.Fatalf("runDeleteFunction(%v) = nil, want error containing %q", tc.args, tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("runDeleteFunction(%v) error = %q, want substring %q", tc.args, err.Error(), tc.wantSub)
+			}
+			if got := srv.totalCalls() - before; got != 0 {
+				t.Errorf("runDeleteFunction(%v) outbound gRPC calls = %d, want 0", tc.args, got)
+			}
+		})
+	}
+}
+
+// UT-10b: Verify deletefunction resource names, routing headers, and optional etag forwarding.
+func TestRunDeleteFunction_WithAndWithoutEtag(t *testing.T) {
+	fnPrefix := "projects/my-proj/instances/my-inst/functions/"
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	if err := runDeleteFunction(t.Context(), api, "my-proj", "my-inst", "fn_one"); err != nil {
+		t.Fatalf("runDeleteFunction without etag unexpected error: %v", err)
+	}
+	complexEtag := `W/"/v1/hash=abc=="`
+	if err := runDeleteFunction(t.Context(), api, "my-proj", "my-inst", "fn_two", "etag="+complexEtag); err != nil {
+		t.Fatalf("runDeleteFunction with etag unexpected error: %v", err)
+	}
+
+	wantReqs := []*btapb.DeleteFunctionRequest{
+		{Name: fnPrefix + "fn_one", Etag: ""},
+		{Name: fnPrefix + "fn_two", Etag: complexEtag},
+	}
+	if diff := cmp.Diff(wantReqs, srv.deleteReqs, protocmp.Transform()); diff != "" {
+		t.Errorf("DeleteFunctionRequests mismatch (-want +got):\n%s", diff)
+	}
+	delCalls := srv.callsFor("DeleteFunction")
+	if diff := cmp.Diff([]string{"name=" + url.QueryEscape(fnPrefix+"fn_two")}, delCalls[1].md.Get(xGoogRequestParamsHeader)); diff != "" {
+		t.Errorf("DeleteFunction x-goog-request-params mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// UT-10c: Verify NotFound, Aborted, and FailedPrecondition gRPC error propagation on DeleteFunction.
+func TestRunDeleteFunction_StatusErrorPropagation(t *testing.T) {
+	errCases := []struct {
+		name     string
+		srvErr   error
+		wantCode codes.Code
+	}{
+		{
+			name:     "delete_not_found",
+			srvErr:   status.Error(codes.NotFound, "function not found"),
+			wantCode: codes.NotFound,
+		},
+		{
+			name:     "delete_aborted_etag_mismatch",
+			srvErr:   status.Error(codes.Aborted, "etag mismatch"),
+			wantCode: codes.Aborted,
+		},
+		{
+			name:     "delete_failed_precondition_deletion_protection",
+			srvErr:   status.Error(codes.FailedPrecondition, "deletion_protection is enabled"),
+			wantCode: codes.FailedPrecondition,
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := &fakeFunctionAdminServer{
+				deleteFn: func(_ context.Context, _ *btapb.DeleteFunctionRequest) (*emptypb.Empty, error) {
+					return nil, tc.srvErr
+				},
+			}
+			api := startFakeFunctionAdminGRPC(t, srv)
+
+			err := runDeleteFunction(t.Context(), api, "my-proj", "my-inst", "fn_err", "etag=v1")
+			if gotCode := status.Code(err); gotCode != tc.wantCode {
+				t.Errorf("status.Code(err) = %v, want %v (err: %v)", gotCode, tc.wantCode, err)
+			}
+		})
+	}
+}
+
 var allFunctionCommandNames = []string{
+	"deletefunction",
 	"getfunction",
 	"listfunctions",
 }

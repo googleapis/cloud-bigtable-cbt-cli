@@ -468,6 +468,20 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name: "createfunction",
+		Desc: "Create a user-defined function in the configured instance",
+		do:   doCreateFunction,
+		Usage: "cbt createfunction <function-id> wasm-file=<path> args=<name>:<type>[,...] return-type=<type> [deletion-protection=<true|false>]\n\n" +
+			"  function-id             Unique ID for the function ([a-z_][a-z0-9_]*)\n" +
+			"  wasm-file=<path>        Path to the compiled .wasm module (max 10 MiB)\n" +
+			"  args=<name>:<type>      Comma-separated argument definitions\n" +
+			"  return-type=<type>      Return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, or ARRAY<T>)\n" +
+			"  deletion-protection     Optional boolean to protect the function against deletion\n\n" +
+			"    Example:\n" +
+			"      cbt createfunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name: "createinstance",
 		Desc: "Create an instance with an initial cluster",
 		do:   doCreateInstance,

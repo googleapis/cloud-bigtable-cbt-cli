@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -45,6 +46,7 @@ import (
 )
 
 const (
+	maxWASMSourceBytes              = 10 * 1024 * 1024 // 10 MiB limit enforced by BigtableInstanceAdmin.
 	maxFunctionIdentifierLen        = 128
 	googleCloudResourcePrefixHeader = "google-cloud-resource-prefix"
 	xGoogRequestParamsHeader        = "x-goog-request-params"
@@ -64,6 +66,7 @@ var (
 // functionAdminAPI abstracts the BigtableInstanceAdmin Function RPCs and LRO
 // polling so CLI commands can be tested hermetically without package-level globals.
 type functionAdminAPI interface {
+	CreateFunction(ctx context.Context, req *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error)
 	GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error)
 	ListFunctions(ctx context.Context, req *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 	DeleteFunction(ctx context.Context, req *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
@@ -136,6 +139,10 @@ func withResourcePrefix(ctx context.Context, project string) context.Context {
 // or duplicate across pagination loops.
 func withRequestParams(ctx context.Context, key, val string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, xGoogRequestParamsHeader, fmt.Sprintf("%s=%s", key, url.QueryEscape(val)))
+}
+
+func (c *grpcFunctionAdminClient) CreateFunction(ctx context.Context, req *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+	return c.admin.CreateFunction(withRequestParams(ctx, "parent", req.GetParent()), req)
 }
 
 func (c *grpcFunctionAdminClient) GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
@@ -216,6 +223,20 @@ func validateFunctionIdentifier(id, label string) error {
 		return fmt.Errorf("invalid %s %q: must match [a-z_][a-z0-9_]*", label, id)
 	}
 	return nil
+}
+
+func readWASMSource(wasmPath string) ([]byte, error) {
+	src, err := os.ReadFile(wasmPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading wasm-file: %w", err)
+	}
+	if len(src) == 0 {
+		return nil, fmt.Errorf("wasm-file %q must not be empty", wasmPath)
+	}
+	if len(src) > maxWASMSourceBytes {
+		return nil, fmt.Errorf("wasm-file %q size (%d bytes) exceeds maximum allowed size (%d bytes = 10 MiB)", wasmPath, len(src), maxWASMSourceBytes)
+	}
+	return src, nil
 }
 
 // parseFunctionScalarType parses a scalar type for WasmFunction (when allowSQL is false)
@@ -441,6 +462,98 @@ func parseNonEmptyOption(parsed map[string]string, key string) (string, bool, er
 	return val, true, nil
 }
 
+func runCreateFunction(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
+	const createUsage = "usage: cbt createfunction <function-id> wasm-file=<path> args=<name>:<type>[,...] return-type=<type> [deletion-protection=<true|false>]"
+	if len(args) < 2 {
+		return errors.New(createUsage)
+	}
+	functionID := args[0]
+	if err := validateFunctionIdentifier(functionID, "function-id"); err != nil {
+		return err
+	}
+	parsed, err := parseArgs(args[1:], []string{"wasm-file", "args", "return-type", "deletion-protection"})
+	if err != nil {
+		return err
+	}
+
+	wasmPath, hasWasmFile, err := parseNonEmptyOption(parsed, "wasm-file")
+	if err != nil {
+		return err
+	}
+	if !hasWasmFile {
+		return errors.New("missing required option \"wasm-file\"")
+	}
+
+	argsSpec, hasArgs, err := parseNonEmptyOption(parsed, "args")
+	if err != nil {
+		return err
+	}
+	retSpec, hasReturnType, err := parseNonEmptyOption(parsed, "return-type")
+	if err != nil {
+		return err
+	}
+
+	var deletionProtection bool
+	if dpStr, hasDP, err := parseNonEmptyOption(parsed, "deletion-protection"); err != nil {
+		return err
+	} else if hasDP {
+		deletionProtection, err = strconv.ParseBool(dpStr)
+		if err != nil {
+			return fmt.Errorf("parsing deletion-protection %q: %w", dpStr, err)
+		}
+	}
+
+	fn := &btapb.Function{
+		DeletionProtection: deletionProtection,
+	}
+
+	if !hasArgs {
+		return errors.New("missing required option \"args\"")
+	}
+	if !hasReturnType {
+		return errors.New("missing required option \"return-type\"")
+	}
+	fnArgs, err := parseWASMFunctionArgs(argsSpec)
+	if err != nil {
+		return err
+	}
+	retType, err := parseWASMFunctionType(retSpec)
+	if err != nil {
+		return fmt.Errorf("return-type: %w", err)
+	}
+	wasmBytes, err := readWASMSource(wasmPath)
+	if err != nil {
+		return err
+	}
+	fn.FunctionType = &btapb.Function_WasmFunction_{
+		WasmFunction: &btapb.Function_WasmFunction{
+			Arguments:  fnArgs,
+			ReturnType: retType,
+			Source:     wasmBytes,
+		},
+	}
+
+	parent := instanceResourceName(project, instance)
+	req := &btapb.CreateFunctionRequest{
+		Parent:     parent,
+		FunctionId: functionID,
+		Function:   fn,
+	}
+
+	baseCtx := withResourcePrefix(ctx, project)
+	op, err := api.CreateFunction(baseCtx, req)
+	if err != nil {
+		return fmt.Errorf("creating function %q: %w", functionID, err)
+	}
+	created, err := api.WaitFunctionOperation(baseCtx, op)
+	if err != nil {
+		return fmt.Errorf("creating function %q: %w", functionID, err)
+	}
+	_, sig := describeFunctionKindAndSignature(created)
+	fmt.Fprintf(w, "Name: %s\nSignature: %s\n", created.GetName(), sig)
+	return nil
+}
+
 func runListFunctions(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
 	if len(args) != 0 {
 		return errors.New("usage: cbt listfunctions")
@@ -557,6 +670,12 @@ func runDeleteFunction(ctx context.Context, api functionAdminAPI, project, insta
 		return fmt.Errorf("deleting function %q: %w", functionID, err)
 	}
 	return nil
+}
+
+func doCreateFunction(ctx context.Context, args ...string) {
+	if err := runCreateFunction(ctx, defaultFunctionAdminAPI(), config.Project, config.Instance, os.Stdout, args...); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func doListFunctions(ctx context.Context, args ...string) {

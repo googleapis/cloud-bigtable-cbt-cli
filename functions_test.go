@@ -45,8 +45,10 @@ type fakeFunctionAdminServer struct {
 
 	mu       sync.Mutex
 	calls    []recordedAdminCall
+	getReqs  []*btapb.GetFunctionRequest
 	listReqs []*btapb.ListFunctionsRequest
 
+	getFn  func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
 	listFn func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 }
 
@@ -73,6 +75,19 @@ func (s *fakeFunctionAdminServer) callsFor(method string) []recordedAdminCall {
 		}
 	}
 	return out
+}
+
+func (s *fakeFunctionAdminServer) GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
+	s.record(ctx, "GetFunction")
+	cloned := proto.Clone(req).(*btapb.GetFunctionRequest)
+	s.mu.Lock()
+	s.getReqs = append(s.getReqs, cloned)
+	fn := s.getFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "unexpected GetFunction")
 }
 
 func (s *fakeFunctionAdminServer) ListFunctions(ctx context.Context, req *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error) {
@@ -170,6 +185,299 @@ func TestFormatAdminType_AllSQLVariants(t *testing.T) {
 				t.Errorf("formatAdminType(%v) = %q, want %q", tc.typ, got, tc.want)
 			}
 		})
+	}
+}
+
+// Verify getfunction argument and identifier rejections fail fast with zero outbound gRPC calls.
+func TestRunGetFunction_ValidationErrors_ZeroRPCs(t *testing.T) {
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	errCases := []struct {
+		name    string
+		args    []string
+		wantSub string
+	}{
+		{
+			name:    "get_no_args_rejected",
+			args:    nil,
+			wantSub: "usage: cbt getfunction",
+		},
+		{
+			name:    "get_too_many_args_rejected",
+			args:    []string{"doc_fn", "extra"},
+			wantSub: "usage: cbt getfunction",
+		},
+		{
+			name:    "get_invalid_function_id_rejected",
+			args:    []string{"BadFunc"},
+			wantSub: "invalid function-id",
+		},
+		{
+			name:    "get_overlong_function_id_rejected",
+			args:    []string{strings.Repeat("f", maxFunctionIdentifierLen+1)},
+			wantSub: "exceeds maximum length",
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			before := srv.totalCalls()
+			err := runGetFunction(t.Context(), api, "p", "i", io.Discard, tc.args...)
+			if err == nil {
+				t.Fatalf("runGetFunction(%v) = nil, want error containing %q", tc.args, tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("runGetFunction(%v) error = %q, want substring %q", tc.args, err.Error(), tc.wantSub)
+			}
+			if got := srv.totalCalls() - before; got != 0 {
+				t.Errorf("runGetFunction(%v) outbound gRPC calls = %d, want 0", tc.args, got)
+			}
+		})
+	}
+}
+
+// UT-9 & UT-10a: Verify getfunction WASM metadata rendering with both raw and
+// pre-encoded ASCII hex SourceSha256 digests and Etag.
+func TestRunGetFunction_WASMWithSHA256AndEtag(t *testing.T) {
+	fnPrefix := "projects/my-proj/instances/my-inst/functions/"
+	preEncodedHex := "0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdefABCD"
+
+	tests := []struct {
+		name         string
+		fnID         string
+		sourceSHA256 []byte
+		wantSHA256   string
+	}{
+		{
+			name:         "raw_bytes",
+			fnID:         "doc_extract_snippet",
+			sourceSHA256: []byte{0x01, 0x23, 0xab, 0xcd},
+			wantSHA256:   "0123abcd",
+		},
+		{
+			name:         "raw_32_byte_digest_of_ascii_hex_bytes",
+			fnID:         "doc_raw_digest",
+			sourceSHA256: bytes.Repeat([]byte("a"), 32),
+			wantSHA256:   strings.Repeat("61", 32),
+		},
+		{
+			name:         "pre_encoded_64_byte_ascii_hex",
+			fnID:         "doc_preencoded_digest",
+			sourceSHA256: []byte(preEncodedHex),
+			wantSHA256:   "0123456789abcdefabcdef0123456789abcdefabcdef0123456789abcdefabcd",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := &fakeFunctionAdminServer{
+				getFn: func(_ context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
+					return &btapb.Function{
+						Name:               req.GetName(),
+						Etag:               `W/"v2"`,
+						DeletionProtection: true,
+						FunctionType: &btapb.Function_WasmFunction_{
+							WasmFunction: &btapb.Function_WasmFunction{
+								Arguments:    []*btapb.Function_Argument{{Name: "doc", DataType: &btapb.Type{Kind: &btapb.Type_BytesType{BytesType: &btapb.Type_Bytes{}}}}},
+								ReturnType:   &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}},
+								SourceSha256: tc.sourceSHA256,
+							},
+						},
+					}, nil
+				},
+			}
+			api := startFakeFunctionAdminGRPC(t, srv)
+
+			var out bytes.Buffer
+			if err := runGetFunction(t.Context(), api, "my-proj", "my-inst", &out, tc.fnID); err != nil {
+				t.Fatalf("runGetFunction(%q) unexpected error: %v", tc.fnID, err)
+			}
+			wantName := fnPrefix + tc.fnID
+			if gotName := srv.getReqs[0].GetName(); gotName != wantName {
+				t.Errorf("GetFunction(%q) Request.Name = %q, want %q", tc.fnID, gotName, wantName)
+			}
+			getCalls := srv.callsFor("GetFunction")
+			if diff := cmp.Diff([]string{"name=" + url.QueryEscape(wantName)}, getCalls[0].md.Get(xGoogRequestParamsHeader)); diff != "" {
+				t.Errorf("GetFunction(%q) x-goog-request-params mismatch (-want +got):\n%s", tc.fnID, diff)
+			}
+			if diff := cmp.Diff([]string{"projects/my-proj"}, getCalls[0].md.Get(googleCloudResourcePrefixHeader)); diff != "" {
+				t.Errorf("GetFunction(%q) google-cloud-resource-prefix mismatch (-want +got):\n%s", tc.fnID, diff)
+			}
+			wantOut := strings.Join([]string{
+				"Name: " + wantName,
+				"Type: WASM",
+				`Etag: W/"v2"`,
+				"DeletionProtection: true",
+				"Arguments: doc:BYTES",
+				"ReturnType: STRING",
+				"SourceSha256: " + tc.wantSHA256,
+				"",
+			}, "\n")
+			if diff := cmp.Diff(wantOut, out.String()); diff != "" {
+				t.Errorf("runGetFunction(%q) output mismatch (-want +got):\n%s", tc.fnID, diff)
+			}
+		})
+	}
+}
+
+func TestFormatWASMSourceSHA256(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  []byte
+		want string
+	}{
+		{
+			name: "nil_slice",
+			raw:  nil,
+			want: "",
+		},
+		{
+			name: "empty_slice",
+			raw:  []byte{},
+			want: "",
+		},
+		{
+			name: "raw_32_byte_sha256",
+			raw:  bytes.Repeat([]byte("f"), 32),
+			want: strings.Repeat("66", 32),
+		},
+		{
+			name: "all_hex_63_bytes_not_treated_as_preencoded",
+			raw:  bytes.Repeat([]byte("a"), 63),
+			want: strings.Repeat("61", 63),
+		},
+		{
+			name: "all_hex_65_bytes_not_treated_as_preencoded",
+			raw:  bytes.Repeat([]byte("a"), 65),
+			want: strings.Repeat("61", 65),
+		},
+		{
+			name: "preencoded_64_byte_mixed_case_boundaries",
+			raw:  []byte("09afAF0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcd"),
+			want: "09afaf0123456789abcdefabcdef0123456789abcdefabcdef0123456789abcd",
+		},
+		{
+			name: "non_hex_64_bytes_below_zero",
+			raw:  append([]byte{'/'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "2f" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_above_nine",
+			raw:  append([]byte{':'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "3a" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_below_upper_a",
+			raw:  append([]byte{'@'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "40" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_above_upper_f",
+			raw:  append([]byte{'G'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "47" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_below_lower_a",
+			raw:  append([]byte{'`'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "60" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_above_lower_f",
+			raw:  append([]byte{'g'}, bytes.Repeat([]byte("0"), 63)...),
+			want: "67" + strings.Repeat("30", 63),
+		},
+		{
+			name: "non_hex_64_bytes_at_tail_index_63",
+			raw:  append(bytes.Repeat([]byte("0"), 63), 'g'),
+			want: strings.Repeat("30", 63) + "67",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatWASMSourceSHA256(tc.raw); got != tc.want {
+				t.Errorf("formatWASMSourceSHA256(%x) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+// UT-9b: Verify getfunction omits optional Etag and SourceSha256 lines when empty.
+func TestRunGetFunction_WASMWithoutSHA256OrEtag(t *testing.T) {
+	srv := &fakeFunctionAdminServer{
+		getFn: func(_ context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
+			return &btapb.Function{
+				Name: req.GetName(),
+				FunctionType: &btapb.Function_WasmFunction_{
+					WasmFunction: &btapb.Function_WasmFunction{
+						Arguments:  []*btapb.Function_Argument{{Name: "x", DataType: &btapb.Type{Kind: &btapb.Type_Int32Type{Int32Type: &btapb.Type_Int32{}}}}},
+						ReturnType: &btapb.Type{Kind: &btapb.Type_Int32Type{Int32Type: &btapb.Type_Int32{}}},
+					},
+				},
+			}, nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	if err := runGetFunction(t.Context(), api, "my-proj", "my-inst", &out, "no_sha"); err != nil {
+		t.Fatalf("runGetFunction unexpected error: %v", err)
+	}
+	if strings.Contains(out.String(), "SourceSha256:") || strings.Contains(out.String(), "Etag:") {
+		t.Errorf("runGetFunction output = %q, should omit empty SourceSha256 and Etag", out.String())
+	}
+}
+
+// UT-9c: Verify getfunction formats SqlScalarFunction definitions with ANY and DATE types.
+func TestRunGetFunction_SQLScalarFunction(t *testing.T) {
+	fnPrefix := "projects/my-proj/instances/my-inst/functions/"
+	srv := &fakeFunctionAdminServer{
+		getFn: func(_ context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
+			return &btapb.Function{
+				Name: req.GetName(),
+				FunctionType: &btapb.Function_SqlScalarFunction_{
+					SqlScalarFunction: &btapb.Function_SqlScalarFunction{
+						Arguments:    []*btapb.Function_Argument{{Name: "x", DataType: nil}},
+						ReturnType:   &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}},
+						FunctionBody: "DATE_FROM_UNIX_DATE(x)",
+					},
+				},
+			}, nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var out bytes.Buffer
+	if err := runGetFunction(t.Context(), api, "my-proj", "my-inst", &out, "sql_fn"); err != nil {
+		t.Fatalf("runGetFunction unexpected error: %v", err)
+	}
+	wantOut := strings.Join([]string{
+		"Name: " + fnPrefix + "sql_fn",
+		"Type: SQL",
+		"DeletionProtection: false",
+		"Arguments: x:ANY",
+		"ReturnType: DATE",
+		"FunctionBody: DATE_FROM_UNIX_DATE(x)",
+		"",
+	}, "\n")
+	if diff := cmp.Diff(wantOut, out.String()); diff != "" {
+		t.Errorf("runGetFunction SQL output mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// UT-10c: Verify NotFound gRPC error propagation on GetFunction.
+func TestRunGetFunction_StatusErrorPropagation(t *testing.T) {
+	srv := &fakeFunctionAdminServer{
+		getFn: func(_ context.Context, _ *btapb.GetFunctionRequest) (*btapb.Function, error) {
+			return nil, status.Error(codes.NotFound, "function not found")
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	err := runGetFunction(t.Context(), api, "my-proj", "my-inst", io.Discard, "fn_err")
+	if gotCode := status.Code(err); gotCode != codes.NotFound {
+		t.Errorf("status.Code(err) = %v, want %v (err: %v)", gotCode, codes.NotFound, err)
 	}
 }
 
@@ -319,6 +627,7 @@ func TestRunListFunctions_PaginationHeadersAndSQLTypes(t *testing.T) {
 }
 
 var allFunctionCommandNames = []string{
+	"getfunction",
 	"listfunctions",
 }
 

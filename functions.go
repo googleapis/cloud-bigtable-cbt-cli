@@ -463,7 +463,7 @@ func parseNonEmptyOption(parsed map[string]string, key string) (string, bool, er
 }
 
 func runCreateFunction(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
-	const createUsage = "usage: cbt createfunction <function-id> wasm-file=<path> args=<name>:<type>[,...] return-type=<type> [deletion-protection=<true|false>]"
+	const createUsage = "usage: cbt createfunction <function-id> (wasm-file=<path> | body=<sql-expression>) [args=<name>[:<type>][,...]] [return-type=<type>] [deletion-protection=<true|false>]"
 	if len(args) < 2 {
 		return errors.New(createUsage)
 	}
@@ -471,7 +471,7 @@ func runCreateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	if err := validateFunctionIdentifier(functionID, "function-id"); err != nil {
 		return err
 	}
-	parsed, err := parseArgs(args[1:], []string{"wasm-file", "args", "return-type", "deletion-protection"})
+	parsed, err := parseArgs(args[1:], []string{"wasm-file", "body", "args", "return-type", "deletion-protection"})
 	if err != nil {
 		return err
 	}
@@ -480,8 +480,15 @@ func runCreateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	if err != nil {
 		return err
 	}
-	if !hasWasmFile {
-		return errors.New("missing required option \"wasm-file\"")
+	bodyExpr, hasBody, err := parseNonEmptyOption(parsed, "body")
+	if err != nil {
+		return err
+	}
+	if hasWasmFile && hasBody {
+		return errors.New("cannot specify both \"wasm-file\" and \"body\"")
+	}
+	if !hasWasmFile && !hasBody {
+		return errors.New("missing required option \"wasm-file\" or \"body\"")
 	}
 
 	argsSpec, hasArgs, err := parseNonEmptyOption(parsed, "args")
@@ -507,30 +514,54 @@ func runCreateFunction(ctx context.Context, api functionAdminAPI, project, insta
 		DeletionProtection: deletionProtection,
 	}
 
-	if !hasArgs {
-		return errors.New("missing required option \"args\"")
-	}
-	if !hasReturnType {
-		return errors.New("missing required option \"return-type\"")
-	}
-	fnArgs, err := parseWASMFunctionArgs(argsSpec)
-	if err != nil {
-		return err
-	}
-	retType, err := parseWASMFunctionType(retSpec)
-	if err != nil {
-		return fmt.Errorf("return-type: %w", err)
-	}
-	wasmBytes, err := readWASMSource(wasmPath)
-	if err != nil {
-		return err
-	}
-	fn.FunctionType = &btapb.Function_WasmFunction_{
-		WasmFunction: &btapb.Function_WasmFunction{
-			Arguments:  fnArgs,
-			ReturnType: retType,
-			Source:     wasmBytes,
-		},
+	if hasWasmFile {
+		if !hasArgs {
+			return errors.New("missing required option \"args\"")
+		}
+		if !hasReturnType {
+			return errors.New("missing required option \"return-type\"")
+		}
+		fnArgs, err := parseWASMFunctionArgs(argsSpec)
+		if err != nil {
+			return err
+		}
+		retType, err := parseWASMFunctionType(retSpec)
+		if err != nil {
+			return fmt.Errorf("return-type: %w", err)
+		}
+		wasmBytes, err := readWASMSource(wasmPath)
+		if err != nil {
+			return err
+		}
+		fn.FunctionType = &btapb.Function_WasmFunction_{
+			WasmFunction: &btapb.Function_WasmFunction{
+				Arguments:  fnArgs,
+				ReturnType: retType,
+				Source:     wasmBytes,
+			},
+		}
+	} else {
+		var fnArgs []*btapb.Function_Argument
+		if hasArgs {
+			fnArgs, err = parseSQLFunctionArgs(argsSpec)
+			if err != nil {
+				return err
+			}
+		}
+		var retType *btapb.Type
+		if hasReturnType && !strings.EqualFold(strings.TrimSpace(retSpec), "ANY") {
+			retType, err = parseSQLFunctionType(retSpec)
+			if err != nil {
+				return fmt.Errorf("return-type: %w", err)
+			}
+		}
+		fn.FunctionType = &btapb.Function_SqlScalarFunction_{
+			SqlScalarFunction: &btapb.Function_SqlScalarFunction{
+				Arguments:    fnArgs,
+				ReturnType:   retType,
+				FunctionBody: bodyExpr,
+			},
+		}
 	}
 
 	parent := instanceResourceName(project, instance)

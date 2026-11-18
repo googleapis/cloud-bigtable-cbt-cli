@@ -149,16 +149,18 @@ Usage:
 
 Usage:
 
-	cbt createfunction <function-id> wasm-file=<path> args=<name>:<type>[,...] return-type=<type> [deletion-protection=<true|false>]
+	cbt createfunction <function-id> (wasm-file=<path> | body=<sql-expression>) [args=<name>[:<type>][,...]] [return-type=<type>] [deletion-protection=<true|false>]
 
 	  function-id             Unique ID for the function ([a-z_][a-z0-9_]*)
-	  wasm-file=<path>        Path to the compiled .wasm module (max 10 MiB)
-	  args=<name>:<type>      Comma-separated argument definitions
-	  return-type=<type>      Return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, or ARRAY<T>)
+	  wasm-file=<path>        Path to the compiled .wasm module for a WASM function (max 10 MiB)
+	  body=<sql-expression>   SQL expression body for a SQL scalar function
+	  args=<name>[:<type>]    Comma-separated argument definitions (required for wasm-file)
+	  return-type=<type>      Return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, or ARRAY<T>; SQL functions also accept DATE; required for wasm-file)
 	  deletion-protection     Optional boolean to protect the function against deletion
 
-	    Example:
+	    Examples:
 	      cbt createfunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
+	      cbt createfunction add_one body="x + 1" args=x:INT64 return-type=INT64
 
 # Create an instance with an initial cluster
 

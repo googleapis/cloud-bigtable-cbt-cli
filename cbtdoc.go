@@ -34,6 +34,7 @@ The commands are:
 	createappprofile          Create app profile for an instance
 	createcluster             Create a cluster in the configured instance
 	createfamily              Create a column family
+	createfunction            Create a user-defined function in the configured instance
 	createinstance            Create an instance with an initial cluster
 	createtable               Create a table
 	deleteallrows             Delete all rows
@@ -143,6 +144,21 @@ Usage:
 	cbt createfamily <table-id> <family>
 
 	    Example: cbt createfamily mobile-time-series stats_summary
+
+# Create a user-defined function in the configured instance
+
+Usage:
+
+	cbt createfunction <function-id> wasm-file=<path> args=<name>:<type>[,...] return-type=<type> [deletion-protection=<true|false>]
+
+	  function-id             Unique ID for the function ([a-z_][a-z0-9_]*)
+	  wasm-file=<path>        Path to the compiled .wasm module (max 10 MiB)
+	  args=<name>:<type>      Comma-separated argument definitions
+	  return-type=<type>      Return type (BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, or ARRAY<T>)
+	  deletion-protection     Optional boolean to protect the function against deletion
+
+	    Example:
+	      cbt createfunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
 
 # Create an instance with an initial cluster
 

@@ -215,6 +215,66 @@ func parseSQLFunctionType(spec string) (*btapb.Type, error) {
 	return parseFunctionType(spec, true)
 }
 
+func parseFunctionArgs(spec string, allowSQL bool) ([]*btapb.Function_Argument, error) {
+	if strings.TrimSpace(spec) == "" {
+		if allowSQL {
+			return nil, errors.New("SQL function args must not be empty")
+		}
+		return nil, errors.New("WASM function args must specify at least one <name>:<type> pair")
+	}
+	parts := strings.Split(spec, ",")
+	args := make([]*btapb.Function_Argument, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, rawPart := range parts {
+		part := strings.TrimSpace(rawPart)
+		if part == "" {
+			return nil, fmt.Errorf("empty argument segment in args=%q", spec)
+		}
+		var argName string
+		var argType *btapb.Type
+		if colon := strings.Index(part, ":"); colon >= 0 {
+			argName = strings.TrimSpace(part[:colon])
+			argTypeStr := strings.TrimSpace(part[colon+1:])
+			if err := validateFunctionIdentifier(argName, "argument name"); err != nil {
+				return nil, err
+			}
+			if !(allowSQL && strings.EqualFold(argTypeStr, "ANY")) {
+				var err error
+				argType, err = parseFunctionType(argTypeStr, allowSQL)
+				if err != nil {
+					return nil, fmt.Errorf("argument %q: %w", argName, err)
+				}
+			}
+		} else {
+			if !allowSQL {
+				return nil, fmt.Errorf("invalid argument %q: expected <name>:<type>", part)
+			}
+			argName = part
+			if err := validateFunctionIdentifier(argName, "argument name"); err != nil {
+				return nil, err
+			}
+		}
+		lowerName := strings.ToLower(argName)
+		if _, dup := seen[lowerName]; dup {
+			return nil, fmt.Errorf("duplicate argument name %q", argName)
+		}
+		seen[lowerName] = struct{}{}
+		args = append(args, &btapb.Function_Argument{
+			Name:     argName,
+			DataType: argType,
+		})
+	}
+	return args, nil
+}
+
+func parseWASMFunctionArgs(spec string) ([]*btapb.Function_Argument, error) {
+	return parseFunctionArgs(spec, false)
+}
+
+func parseSQLFunctionArgs(spec string) ([]*btapb.Function_Argument, error) {
+	return parseFunctionArgs(spec, true)
+}
+
 // formatAdminType is a total, non-panicking formatter across all Bigtable Admin
 // Type variants so listfunctions and getfunction render both WasmFunction and
 // SqlScalarFunction definitions cleanly.

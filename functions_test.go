@@ -321,6 +321,150 @@ func TestParseWASMFunctionType_Errors(t *testing.T) {
 	}
 }
 
+func TestParseWASMFunctionArgs_Success(t *testing.T) {
+	got, err := parseWASMFunctionArgs("payload:bytes, keyword:STRING, _window_1:ARRAY<INT32>")
+	if err != nil {
+		t.Fatalf("parseWASMFunctionArgs unexpected error: %v", err)
+	}
+	want := []*btapb.Function_Argument{
+		{
+			Name:     "payload",
+			DataType: &btapb.Type{Kind: &btapb.Type_BytesType{BytesType: &btapb.Type_Bytes{}}},
+		},
+		{
+			Name:     "keyword",
+			DataType: &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}},
+		},
+		{
+			Name: "_window_1",
+			DataType: &btapb.Type{
+				Kind: &btapb.Type_ArrayType{
+					ArrayType: &btapb.Type_Array{
+						ElementType: &btapb.Type{Kind: &btapb.Type_Int32Type{Int32Type: &btapb.Type_Int32{}}},
+					},
+				},
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+		t.Errorf("parseWASMFunctionArgs mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestParseWASMFunctionArgs_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    string
+		wantSub string
+	}{
+		{name: "empty_spec", spec: "", wantSub: "at least one"},
+		{name: "missing_colon", spec: "payload_BYTES", wantSub: "expected <name>:<type>"},
+		{name: "empty_arg_name", spec: ":BYTES", wantSub: "invalid argument name"},
+		{name: "empty_arg_type", spec: "payload:", wantSub: "must not be empty"},
+		{name: "trailing_comma", spec: "payload:BYTES,", wantSub: "empty argument segment"},
+		{name: "leading_comma", spec: ",payload:BYTES", wantSub: "empty argument segment"},
+		{name: "middle_empty_segment", spec: "a:INT64,,b:STRING", wantSub: "empty argument segment"},
+		{name: "duplicate_exact_arg_name", spec: "x:INT64,x:STRING", wantSub: "duplicate argument name"},
+		{name: "duplicate_case_variant_arg_name", spec: "x:INT64,X:STRING", wantSub: "invalid argument name"},
+		{name: "invalid_arg_identifier_leading_digit", spec: "1arg:INT64", wantSub: "must match [a-z_][a-z0-9_]*"},
+		{name: "invalid_arg_identifier_hyphen", spec: "my-arg:INT64", wantSub: "must match [a-z_][a-z0-9_]*"},
+		{name: "overlong_arg_identifier", spec: strings.Repeat("a", maxFunctionIdentifierLen+1) + ":INT64", wantSub: "exceeds maximum length"},
+		{name: "any_type_rejected_for_wasm", spec: "payload:ANY", wantSub: "unsupported WASM function type"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseWASMFunctionArgs(tc.spec)
+			if err == nil {
+				t.Fatalf("parseWASMFunctionArgs(%q) = %v, want error containing %q", tc.spec, got, tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("parseWASMFunctionArgs(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
+			}
+		})
+	}
+}
+
+func TestParseSQLFunctionType_And_Args(t *testing.T) {
+	dateType := &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}}
+	arrayDateType := &btapb.Type{Kind: &btapb.Type_ArrayType{ArrayType: &btapb.Type_Array{ElementType: dateType}}}
+
+	gotDate, err := parseSQLFunctionType("DATE")
+	if err != nil {
+		t.Fatalf("parseSQLFunctionType(\"DATE\") unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(dateType, gotDate, protocmp.Transform()); diff != "" {
+		t.Errorf("parseSQLFunctionType(\"DATE\") mismatch (-want +got):\n%s", diff)
+	}
+
+	gotArrayDate, err := parseSQLFunctionType("ARRAY<DATE>")
+	if err != nil {
+		t.Fatalf("parseSQLFunctionType(\"ARRAY<DATE>\") unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(arrayDateType, gotArrayDate, protocmp.Transform()); diff != "" {
+		t.Errorf("parseSQLFunctionType(\"ARRAY<DATE>\") mismatch (-want +got):\n%s", diff)
+	}
+
+	typeErrTests := []struct {
+		name    string
+		spec    string
+		wantSub string
+	}{
+		{name: "empty", spec: " ", wantSub: "must not be empty"},
+		{name: "unsupported_scalar", spec: "JSON", wantSub: "unsupported SQL function type"},
+		{name: "unsupported_array_element", spec: "ARRAY<JSON>", wantSub: "unsupported SQL function type"},
+		{name: "unclosed_array", spec: "ARRAY<DATE", wantSub: "missing closing '>'"},
+		{name: "nested_array", spec: "ARRAY<ARRAY<DATE>>", wantSub: "nested array type"},
+	}
+	for _, tc := range typeErrTests {
+		t.Run("type_err_"+tc.name, func(t *testing.T) {
+			if got, err := parseSQLFunctionType(tc.spec); err == nil {
+				t.Fatalf("parseSQLFunctionType(%q) = %v, want error containing %q", tc.spec, got, tc.wantSub)
+			} else if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("parseSQLFunctionType(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
+			}
+		})
+	}
+
+	gotArgs, err := parseSQLFunctionArgs("d:DATE, arr:ARRAY<DATE>, untyped_arg, any_arg:ANY")
+	if err != nil {
+		t.Fatalf("parseSQLFunctionArgs unexpected error: %v", err)
+	}
+	wantArgs := []*btapb.Function_Argument{
+		{Name: "d", DataType: dateType},
+		{Name: "arr", DataType: arrayDateType},
+		{Name: "untyped_arg"},
+		{Name: "any_arg"},
+	}
+	if diff := cmp.Diff(wantArgs, gotArgs, protocmp.Transform()); diff != "" {
+		t.Errorf("parseSQLFunctionArgs mismatch (-want +got):\n%s", diff)
+	}
+
+	argErrTests := []struct {
+		name    string
+		spec    string
+		wantSub string
+	}{
+		{name: "empty_spec", spec: "  ", wantSub: "SQL function args must not be empty"},
+		{name: "empty_segment", spec: "d:DATE,", wantSub: "empty argument segment"},
+		{name: "invalid_untyped_identifier", spec: "BadArg", wantSub: "must match [a-z_][a-z0-9_]*"},
+		{name: "invalid_typed_identifier", spec: "BadArg:DATE", wantSub: "must match [a-z_][a-z0-9_]*"},
+		{name: "empty_arg_type", spec: "d:", wantSub: "must not be empty"},
+		{name: "unsupported_arg_type", spec: "d:JSON", wantSub: "unsupported SQL function type"},
+		{name: "duplicate_arg_name", spec: "d:DATE,d:INT64", wantSub: "duplicate argument name"},
+		{name: "duplicate_untyped_arg_name", spec: "d,d", wantSub: "duplicate argument name"},
+	}
+	for _, tc := range argErrTests {
+		t.Run("arg_err_"+tc.name, func(t *testing.T) {
+			if got, err := parseSQLFunctionArgs(tc.spec); err == nil {
+				t.Fatalf("parseSQLFunctionArgs(%q) = %v, want error containing %q", tc.spec, got, tc.wantSub)
+			} else if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("parseSQLFunctionArgs(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
+			}
+		})
+	}
+}
+
 // Verify getfunction argument and identifier rejections fail fast with zero outbound gRPC calls.
 func TestRunGetFunction_ValidationErrors_ZeroRPCs(t *testing.T) {
 	srv := &fakeFunctionAdminServer{}

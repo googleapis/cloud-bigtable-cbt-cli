@@ -575,14 +575,14 @@ func TestRunCreateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
 			wantSub: "usage: cbt createfunction",
 		},
 		{
-			name:    "create_missing_wasm_file_option_rejected",
-			args:    []string{"my_fn", "args=x:INT64", "return-type=INT64"},
-			wantSub: "missing required option \"wasm-file\"",
+			name:    "create_both_wasm_file_and_body_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "body=1 + 1"},
+			wantSub: "cannot specify both \"wasm-file\" and \"body\"",
 		},
 		{
-			name:    "create_body_option_rejected",
-			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL", "body=1 + 1"},
-			wantSub: "unknown arg key",
+			name:    "create_missing_both_wasm_file_and_body_rejected",
+			args:    []string{"my_fn", "args=x:INT64", "return-type=INT64"},
+			wantSub: "missing required option \"wasm-file\" or \"body\"",
 		},
 		{
 			name:    "create_missing_args_option_three_tokens",
@@ -780,6 +780,98 @@ func TestRunCreateFunction_SuccessWithMultiPollLRO(t *testing.T) {
 	wantOut := "Name: projects/my-proj/instances/my-inst/functions/doc_has_keyword\nSignature: (payload:BYTES, keyword:STRING) -> BOOL\n"
 	if out.String() != wantOut {
 		t.Errorf("runCreateFunction output = %q, want %q", out.String(), wantOut)
+	}
+}
+
+func TestRunCreateFunction_SQLScalarFunction(t *testing.T) {
+	fnName := "projects/my-proj/instances/my-inst/functions/add_days"
+	createdFn := &btapb.Function{
+		Name: fnName,
+		FunctionType: &btapb.Function_SqlScalarFunction_{
+			SqlScalarFunction: &btapb.Function_SqlScalarFunction{
+				Arguments: []*btapb.Function_Argument{
+					{Name: "d", DataType: &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}}},
+					{Name: "delta", DataType: nil},
+				},
+				ReturnType:   &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}},
+				FunctionBody: "DATE_ADD(d, INTERVAL delta DAY)",
+			},
+		},
+	}
+
+	srv := &fakeFunctionAdminServer{
+		createFn: func(_ context.Context, _ *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/op-sql-create", createdFn), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	var createOut bytes.Buffer
+	err := runCreateFunction(
+		t.Context(),
+		api,
+		"my-proj",
+		"my-inst",
+		&createOut,
+		"add_days",
+		"body=DATE_ADD(d, INTERVAL delta DAY)",
+		"args=d:DATE,delta",
+		"return-type=DATE",
+	)
+	if err != nil {
+		t.Fatalf("runCreateFunction(SQL) unexpected error: %v", err)
+	}
+	wantCreateReq := &btapb.CreateFunctionRequest{
+		Parent:     "projects/my-proj/instances/my-inst",
+		FunctionId: "add_days",
+		Function: &btapb.Function{
+			FunctionType: createdFn.GetFunctionType(),
+		},
+	}
+	if diff := cmp.Diff(wantCreateReq, srv.createReqs[0], protocmp.Transform()); diff != "" {
+		t.Errorf("CreateFunctionRequest(SQL) mismatch (-want +got):\n%s", diff)
+	}
+	wantCreateOut := "Name: " + fnName + "\nSignature: (d:DATE, delta:ANY) -> DATE\n"
+	if createOut.String() != wantCreateOut {
+		t.Errorf("runCreateFunction(SQL) output = %q, want %q", createOut.String(), wantCreateOut)
+	}
+}
+
+// Verify SQL functions may omit args and return-type, and that return-type=ANY
+// leaves the return type unset.
+func TestRunCreateFunction_SQLOptionalArgsAndReturnType(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "body_only", args: []string{"body=1 + 1"}},
+		{name: "return_type_any", args: []string{"body=1 + 1", "return-type=ANY"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := &fakeFunctionAdminServer{
+				createFn: func(_ context.Context, req *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+					return packOperationResponse(t, "operations/op-sql-min", req.GetFunction()), nil
+				},
+			}
+			api := startFakeFunctionAdminGRPC(t, srv)
+			args := append([]string{"const_two"}, tc.args...)
+			if err := runCreateFunction(t.Context(), api, "my-proj", "my-inst", io.Discard, args...); err != nil {
+				t.Fatalf("runCreateFunction(%v) unexpected error: %v", args, err)
+			}
+			wantReq := &btapb.CreateFunctionRequest{
+				Parent:     "projects/my-proj/instances/my-inst",
+				FunctionId: "const_two",
+				Function: &btapb.Function{
+					FunctionType: &btapb.Function_SqlScalarFunction_{
+						SqlScalarFunction: &btapb.Function_SqlScalarFunction{FunctionBody: "1 + 1"},
+					},
+				},
+			}
+			if diff := cmp.Diff(wantReq, srv.createReqs[0], protocmp.Transform()); diff != "" {
+				t.Errorf("CreateFunctionRequest(%v) mismatch (-want +got):\n%s", args, diff)
+			}
+		})
 	}
 }
 

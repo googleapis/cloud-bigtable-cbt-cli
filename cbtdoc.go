@@ -41,6 +41,7 @@ The commands are:
 	deletecluster             Delete a cluster from the configured instance
 	deletecolumn              Delete all cells in a column
 	deletefamily              Delete a column family
+	deletefunction            Delete a user-defined function from the configured instance
 	deleteinstance            Delete an instance
 	deleterow                 Delete a row
 	deletetable               Delete a table
@@ -211,6 +212,14 @@ Usage:
 	cbt deletefamily <table-id> <family>
 
 	    Example: cbt deletefamily mobile-time-series stats_summary
+
+# Delete a user-defined function from the configured instance
+
+Usage:
+
+	cbt deletefunction <function-id> [etag=<etag>]
+
+	    Example: cbt deletefunction doc_has_keyword
 
 # Delete an instance
 

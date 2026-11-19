@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -25,9 +26,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	btapb "cloud.google.com/go/bigtable/admin/apiv2/adminpb"
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/go-cmp/cmp"
+	gax "github.com/googleapis/gax-go/v2"
+	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -35,8 +40,15 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+var fastTestBackoff = gax.Backoff{
+	Initial:    time.Millisecond,
+	Max:        2 * time.Millisecond,
+	Multiplier: 1.5,
+}
 
 type recordedAdminCall struct {
 	method string
@@ -45,16 +57,19 @@ type recordedAdminCall struct {
 
 type fakeFunctionAdminServer struct {
 	btapb.UnimplementedBigtableInstanceAdminServer
+	longrunningpb.UnimplementedOperationsServer
 
 	mu         sync.Mutex
 	calls      []recordedAdminCall
 	getReqs    []*btapb.GetFunctionRequest
 	listReqs   []*btapb.ListFunctionsRequest
 	deleteReqs []*btapb.DeleteFunctionRequest
+	getOpReqs  []*longrunningpb.GetOperationRequest
 
 	getFn    func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
 	listFn   func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 	deleteFn func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
+	getOpFn  func(context.Context, *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error)
 }
 
 func (s *fakeFunctionAdminServer) record(ctx context.Context, method string) {
@@ -121,6 +136,19 @@ func (s *fakeFunctionAdminServer) DeleteFunction(ctx context.Context, req *btapb
 	return &emptypb.Empty{}, nil
 }
 
+func (s *fakeFunctionAdminServer) GetOperation(ctx context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+	s.record(ctx, "GetOperation")
+	cloned := proto.Clone(req).(*longrunningpb.GetOperationRequest)
+	s.mu.Lock()
+	s.getOpReqs = append(s.getOpReqs, cloned)
+	fn := s.getOpFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "unexpected GetOperation")
+}
+
 func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grpcFunctionAdminClient {
 	t.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -129,6 +157,7 @@ func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grp
 	}
 	grpcSrv := grpc.NewServer()
 	btapb.RegisterBigtableInstanceAdminServer(grpcSrv, srv)
+	longrunningpb.RegisterOperationsServer(grpcSrv, srv)
 	go func() {
 		_ = grpcSrv.Serve(lis)
 	}()
@@ -144,7 +173,7 @@ func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grp
 	t.Cleanup(func() {
 		_ = conn.Close()
 	})
-	return newGRPCFunctionAdminClient(conn)
+	return newGRPCFunctionAdminClient(conn, fastTestBackoff)
 }
 
 // UT-1: Verify WASM scalar and single-level ARRAY<T> type parsing and nil Encoding.
@@ -462,6 +491,112 @@ func TestParseSQLFunctionType_And_Args(t *testing.T) {
 				t.Errorf("parseSQLFunctionArgs(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
 			}
 		})
+	}
+}
+
+// UT-5c: Verify nil, zero-code, and malformed Operation payloads return clean errors without panic.
+func TestWaitFunctionOperation_MalformedOperationsReturnCleanErrors(t *testing.T) {
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+	wrongAny, err := anypb.New(&emptypb.Empty{})
+	if err != nil {
+		t.Fatalf("anypb.New failed: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		op      *longrunningpb.Operation
+		wantSub string
+	}{
+		{
+			name:    "nil_operation",
+			op:      nil,
+			wantSub: "nil long-running operation",
+		},
+		{
+			name:    "pending_operation_missing_name",
+			op:      &longrunningpb.Operation{Done: false, Name: ""},
+			wantSub: "missing name",
+		},
+		{
+			name: "done_with_nil_error_proto",
+			op: &longrunningpb.Operation{
+				Name:   "operations/op-nil-err",
+				Done:   true,
+				Result: &longrunningpb.Operation_Error{Error: nil},
+			},
+			wantSub: "invalid error status",
+		},
+		{
+			name: "done_with_zero_code_error_proto",
+			op: &longrunningpb.Operation{
+				Name:   "operations/op-zero-code",
+				Done:   true,
+				Result: &longrunningpb.Operation_Error{Error: &statuspb.Status{Code: 0, Message: "ok"}},
+			},
+			wantSub: "invalid error status",
+		},
+		{
+			name: "done_with_nil_response_any",
+			op: &longrunningpb.Operation{
+				Name:   "operations/op-nil-resp",
+				Done:   true,
+				Result: &longrunningpb.Operation_Response{Response: nil},
+			},
+			wantSub: "nil response payload",
+		},
+		{
+			name: "done_with_mismatched_any_type",
+			op: &longrunningpb.Operation{
+				Name:   "operations/op-bad-any",
+				Done:   true,
+				Result: &longrunningpb.Operation_Response{Response: wrongAny},
+			},
+			wantSub: "unpacking operation",
+		},
+		{
+			name: "done_without_result_oneof",
+			op: &longrunningpb.Operation{
+				Name: "operations/op-empty-done",
+				Done: true,
+			},
+			wantSub: "without error or response result",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := api.WaitFunctionOperation(t.Context(), tc.op)
+			if err == nil {
+				t.Fatalf("WaitFunctionOperation(%v) = %v, want error containing %q", tc.op, got, tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("WaitFunctionOperation(%v) error = %q, want substring %q", tc.op, err.Error(), tc.wantSub)
+			}
+		})
+	}
+}
+
+// UT-5d: Verify expiring context deadlines (-timeout) abort LRO backoff sleeps promptly.
+func TestWaitFunctionOperation_ContextDeadlineAbortsBackoffSleep(t *testing.T) {
+	srv := &fakeFunctionAdminServer{
+		getOpFn: func(_ context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+			return &longrunningpb.Operation{Name: req.GetName(), Done: false}, nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+	api.backoff = gax.Backoff{
+		Initial:    time.Hour,
+		Max:        time.Hour,
+		Multiplier: 2.0,
+	}
+
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Millisecond))
+	t.Cleanup(cancel)
+
+	_, err := api.WaitFunctionOperation(ctx, &longrunningpb.Operation{Name: "operations/slow-op", Done: false})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("WaitFunctionOperation error = %v, want context.DeadlineExceeded", err)
 	}
 }
 

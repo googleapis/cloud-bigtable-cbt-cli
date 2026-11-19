@@ -14,7 +14,7 @@
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go functions.go -o cbtdoc.go doc
 
 /*
 The `cbt` CLI is a command-line interface that lets you interact with Cloud Bigtable.
@@ -50,6 +50,7 @@ The commands are:
 	import                    Batch write many rows based on the input file
 	listappprofile            Lists app profile for an instance
 	listclusters              List clusters in an instance
+	listfunctions             List user-defined functions in the configured instance
 	listinstances             List instances in a project
 	lookup                    Read from a single row
 	ls                        List tables and column families
@@ -302,6 +303,12 @@ Usage:
 Usage:
 
 	cbt listclusters
+
+# List user-defined functions in the configured instance
+
+Usage:
+
+	cbt listfunctions
 
 # List instances in a project
 

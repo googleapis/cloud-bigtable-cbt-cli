@@ -662,6 +662,13 @@ var commands = []struct {
 		Required: ProjectAndInstanceRequired,
 	},
 	{
+		Name:     "listfunctions",
+		Desc:     "List user-defined functions in the configured instance",
+		do:       doListFunctions,
+		Usage:    "cbt listfunctions",
+		Required: ProjectAndInstanceRequired,
+	},
+	{
 		Name:     "listinstances",
 		Desc:     "List instances in a project",
 		do:       doListInstances,
@@ -1280,7 +1287,7 @@ var docTemplate = template.Must(template.New("doc").Funcs(template.FuncMap{
 
 // DO NOT EDIT. THIS IS AUTOMATICALLY GENERATED.
 // Run "go generate" to regenerate.
-//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go -o cbtdoc.go doc
+//go:generate go run cbt.go gcpolicy.go cbtconfig.go valueformatting.go functions.go -o cbtdoc.go doc
 
 /*
 ` + docIntroTemplate + `

@@ -17,9 +17,18 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/url"
 	"os"
@@ -36,6 +45,7 @@ import (
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -70,12 +80,14 @@ type fakeFunctionAdminServer struct {
 	deleteReqs []*btapb.DeleteFunctionRequest
 	getOpReqs  []*longrunningpb.GetOperationRequest
 
-	createFn func(context.Context, *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error)
-	updateFn func(context.Context, *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error)
-	getFn    func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
-	listFn   func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
-	deleteFn func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
-	getOpFn  func(context.Context, *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error)
+	createFn    func(context.Context, *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error)
+	updateFn    func(context.Context, *btapb.UpdateFunctionRequest) (*longrunningpb.Operation, error)
+	getFn       func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
+	listFn      func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
+	deleteFn    func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
+	getOpFn     func(context.Context, *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error)
+	listInstFn  func(context.Context, *btapb.ListInstancesRequest) (*btapb.ListInstancesResponse, error)
+	listClustFn func(context.Context, *btapb.ListClustersRequest) (*btapb.ListClustersResponse, error)
 }
 
 func (s *fakeFunctionAdminServer) record(ctx context.Context, method string) {
@@ -181,6 +193,28 @@ func (s *fakeFunctionAdminServer) GetOperation(ctx context.Context, req *longrun
 	return nil, status.Error(codes.Unimplemented, "unexpected GetOperation")
 }
 
+func (s *fakeFunctionAdminServer) ListInstances(ctx context.Context, req *btapb.ListInstancesRequest) (*btapb.ListInstancesResponse, error) {
+	s.record(ctx, "ListInstances")
+	s.mu.Lock()
+	fn := s.listInstFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return &btapb.ListInstancesResponse{}, nil
+}
+
+func (s *fakeFunctionAdminServer) ListClusters(ctx context.Context, req *btapb.ListClustersRequest) (*btapb.ListClustersResponse, error) {
+	s.record(ctx, "ListClusters")
+	s.mu.Lock()
+	fn := s.listClustFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return &btapb.ListClustersResponse{}, nil
+}
+
 func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grpcFunctionAdminClient {
 	t.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -206,6 +240,63 @@ func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grp
 		_ = conn.Close()
 	})
 	return newGRPCFunctionAdminClient(conn, fastTestBackoff)
+}
+
+func startFakeFunctionAdminTLSServer(t *testing.T, srv *fakeFunctionAdminServer) (addr string, certFile string) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("ecdsa.GenerateKey failed: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "127.0.0.1"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{"localhost"},
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatalf("x509.CreateCertificate failed: %v", err)
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		t.Fatalf("x509.MarshalECPrivateKey failed: %v", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("tls.X509KeyPair failed: %v", err)
+	}
+	certPath := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(certPath, certPEM, 0600); err != nil {
+		t.Fatalf("writing ca.pem failed: %v", err)
+	}
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen failed: %v", err)
+	}
+	grpcSrv := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+	})))
+	btapb.RegisterBigtableInstanceAdminServer(grpcSrv, srv)
+	longrunningpb.RegisterOperationsServer(grpcSrv, srv)
+	go func() {
+		_ = grpcSrv.Serve(lis)
+	}()
+	t.Cleanup(func() {
+		grpcSrv.Stop()
+		_ = lis.Close()
+	})
+	return lis.Addr().String(), certPath
 }
 
 func writeTempWASMFile(t *testing.T, content []byte) string {
@@ -2136,6 +2227,113 @@ func TestCLIFunctionCommands_HelpRendersUsage(t *testing.T) {
 	}
 }
 
+// UT-13c & RP-1: Verify cliUserAgent and auth-token wiring on functionAdminConnPool
+// (dialed via gtransport.DialPool to avoid deprecated InstanceAdminClientV2().Connection())
+// alongside getInstanceAdminClient() commands (listinstances, listclusters).
+func TestCLIFunctionCommands_UserAgentAndSharedConfigCompat(t *testing.T) {
+	t.Setenv("BIGTABLE_EMULATOR_HOST", "")
+	srv := &fakeFunctionAdminServer{
+		listFn: func(_ context.Context, _ *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error) {
+			return &btapb.ListFunctionsResponse{
+				Functions: []*btapb.Function{
+					{
+						Name: "projects/ua-proj/instances/ua-inst/functions/fn_ua",
+						FunctionType: &btapb.Function_WasmFunction_{
+							WasmFunction: &btapb.Function_WasmFunction{
+								Arguments:  []*btapb.Function_Argument{{Name: "x", DataType: &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}}},
+								ReturnType: &btapb.Type{Kind: &btapb.Type_BoolType{BoolType: &btapb.Type_Bool{}}},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+		listInstFn: func(_ context.Context, _ *btapb.ListInstancesRequest) (*btapb.ListInstancesResponse, error) {
+			return &btapb.ListInstancesResponse{
+				Instances: []*btapb.Instance{{Name: "projects/ua-proj/instances/ua-inst", DisplayName: "UA Instance"}},
+			}, nil
+		},
+		listClustFn: func(_ context.Context, _ *btapb.ListClustersRequest) (*btapb.ListClustersResponse, error) {
+			return &btapb.ListClustersResponse{
+				Clusters: []*btapb.Cluster{{Name: "projects/ua-proj/instances/ua-inst/clusters/c1", Location: "projects/ua-proj/locations/us-central1-a", ServeNodes: 3}},
+			}, nil
+		},
+	}
+	tlsAddr, certPath := startFakeFunctionAdminTLSServer(t, srv)
+
+	origConfig := config
+	origInstAdmin := instanceAdminClient
+	origFnPool := functionAdminConnPool
+	origUserAgent := cliUserAgent
+	t.Cleanup(func() {
+		if instanceAdminClient != nil && instanceAdminClient != origInstAdmin {
+			_ = instanceAdminClient.Close()
+		}
+		if functionAdminConnPool != nil && functionAdminConnPool != origFnPool {
+			_ = functionAdminConnPool.Close()
+		}
+		config = origConfig
+		instanceAdminClient = origInstAdmin
+		functionAdminConnPool = origFnPool
+		cliUserAgent = origUserAgent
+	})
+
+	cfg := &Config{
+		Project:       "ua-proj",
+		Instance:      "ua-inst",
+		AdminEndpoint: tlsAddr,
+		CertFile:      certPath,
+		AccessToken:   "static-test-token",
+		AuthToken:     "iam-authz-token",
+		UserAgent:     "cbt-function-admin-test/1.0",
+		Timeout:       5 * time.Second,
+	}
+	config = cfg
+	instanceAdminClient = nil
+	functionAdminConnPool = nil
+
+	listOut := captureStdout(t, func() {
+		doMain(cfg, []string{"listfunctions"})
+	})
+	if !strings.Contains(listOut, "fn_ua") {
+		t.Errorf("doMain listfunctions output = %q, want fn_ua", listOut)
+	}
+
+	instOut := captureStdout(t, func() {
+		doMain(cfg, []string{"listinstances"})
+	})
+	if !strings.Contains(instOut, "ua-inst") {
+		t.Errorf("doMain listinstances output = %q, want ua-inst", instOut)
+	}
+	clustOut := captureStdout(t, func() {
+		doMain(cfg, []string{"listclusters"})
+	})
+	if !strings.Contains(clustOut, "c1") {
+		t.Errorf("doMain listclusters output = %q, want c1", clustOut)
+	}
+
+	listFnCalls := srv.callsFor("ListFunctions")
+	if len(listFnCalls) != 1 {
+		t.Fatalf("ListFunctions call count = %d, want 1", len(listFnCalls))
+	}
+	uaVals := strings.Join(listFnCalls[0].md.Get("user-agent"), " ")
+	if !strings.Contains(uaVals, "cbt-function-admin-test/1.0") {
+		t.Errorf("ListFunctions user-agent = %q, want substring %q", uaVals, "cbt-function-admin-test/1.0")
+	}
+	if diff := cmp.Diff([]string{"iam-authz-token"}, listFnCalls[0].md.Get("x-goog-iam-authorization-token")); diff != "" {
+		t.Errorf("ListFunctions x-goog-iam-authorization-token mismatch (-want +got):\n%s", diff)
+	}
+
+	if functionAdminConnPool != nil {
+		_ = functionAdminConnPool.Close()
+		functionAdminConnPool = nil
+	}
+	t.Setenv("BIGTABLE_EMULATOR_HOST", "http://127.0.0.1:0")
+	if pool := getFunctionAdminConnPool(); pool == nil {
+		t.Errorf("getFunctionAdminConnPool() with BIGTABLE_EMULATOR_HOST = nil, want non-nil pool")
+	}
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	origStdout := os.Stdout
@@ -2160,4 +2358,40 @@ func captureStdout(t *testing.T, fn func()) string {
 	_ = w.Close()
 	os.Stdout = origStdout
 	return <-outCh
+}
+
+// Verify writeDoc and writeMDDoc succeed and include Function Admin commands
+// in consistent alphabetical order.
+func TestCBTDocAndMDDocSynchronization(t *testing.T) {
+	if flag.Lookup("project") == nil {
+		(&Config{}).RegisterFlags()
+	}
+	docOut := captureStdout(t, func() {
+		doDocReal(t.Context())
+	})
+	mdOut := captureStdout(t, func() {
+		doMDDocReal(t.Context())
+	})
+
+	lastDocIdx := -1
+	lastMDIdx := -1
+	for _, cmdName := range allFunctionCommandNames {
+		docIdx := strings.Index(docOut, "\t"+cmdName+" ")
+		if docIdx < 0 {
+			t.Errorf("doDocReal output missing summary entry for %q", cmdName)
+		} else if docIdx <= lastDocIdx {
+			t.Errorf("doDocReal summary entry for %q appeared out of order (idx %d <= %d)", cmdName, docIdx, lastDocIdx)
+		} else {
+			lastDocIdx = docIdx
+		}
+
+		mdIdx := strings.Index(mdOut, "cbt "+cmdName)
+		if mdIdx < 0 {
+			t.Errorf("doMDDocReal output missing usage entry for %q", cmdName)
+		} else if mdIdx <= lastMDIdx {
+			t.Errorf("doMDDocReal usage entry for %q appeared out of order (idx %d <= %d)", cmdName, mdIdx, lastMDIdx)
+		} else {
+			lastMDIdx = mdIdx
+		}
+	}
 }

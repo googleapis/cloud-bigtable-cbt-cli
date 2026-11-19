@@ -491,10 +491,11 @@ Usage:
 
 Usage:
 
-	cbt updatefunction <function-id> [wasm-file=<path>] [args=<name>:<type>,...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]
+	cbt updatefunction <function-id> [wasm-file=<path> | body=<sql-expression>] [args=<name>[:<type>],...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]
 
-	    Example:
+	    Examples:
 	      cbt updatefunction doc_has_keyword wasm-file=doc_has_keyword.wasm args=payload:BYTES,keyword:STRING return-type=BOOL
+	      cbt updatefunction add_one body="x + 2" args=x:INT64 return-type=INT64
 
 # Print the current cbt version
 

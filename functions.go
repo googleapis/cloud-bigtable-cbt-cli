@@ -592,7 +592,7 @@ func runCreateFunction(ctx context.Context, api functionAdminAPI, project, insta
 }
 
 func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
-	const updateUsage = "usage: cbt updatefunction <function-id> [wasm-file=<path>] [args=<name>:<type>,...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]"
+	const updateUsage = "usage: cbt updatefunction <function-id> [wasm-file=<path> | body=<sql-expression>] [args=<name>[:<type>],...] [return-type=<type>] [deletion-protection=<true|false>] [etag=<etag>]"
 	if len(args) < 2 {
 		return errors.New(updateUsage)
 	}
@@ -600,7 +600,7 @@ func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	if err := validateFunctionIdentifier(functionID, "function-id"); err != nil {
 		return err
 	}
-	parsed, err := parseArgs(args[1:], []string{"wasm-file", "args", "return-type", "deletion-protection", "etag"})
+	parsed, err := parseArgs(args[1:], []string{"wasm-file", "body", "args", "return-type", "deletion-protection", "etag"})
 	if err != nil {
 		return err
 	}
@@ -608,6 +608,13 @@ func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	wasmPath, hasWasmFile, err := parseNonEmptyOption(parsed, "wasm-file")
 	if err != nil {
 		return err
+	}
+	bodyExpr, hasBody, err := parseNonEmptyOption(parsed, "body")
+	if err != nil {
+		return err
+	}
+	if hasWasmFile && hasBody {
+		return errors.New("cannot specify both \"wasm-file\" and \"body\"")
 	}
 	argsSpec, hasArgs, err := parseNonEmptyOption(parsed, "args")
 	if err != nil {
@@ -617,8 +624,8 @@ func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	if err != nil {
 		return err
 	}
-	if (hasArgs || hasReturnType) && !hasWasmFile {
-		return errors.New("updating \"args\" or \"return-type\" requires specifying \"wasm-file\"")
+	if (hasArgs || hasReturnType) && !hasWasmFile && !hasBody {
+		return errors.New("updating \"args\" or \"return-type\" requires specifying \"wasm-file\" or \"body\"")
 	}
 
 	fn := &btapb.Function{
@@ -626,7 +633,34 @@ func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	}
 	var maskPaths []string
 
-	if hasWasmFile {
+	if hasBody {
+		sqlFn := &btapb.Function_SqlScalarFunction{
+			FunctionBody: bodyExpr,
+		}
+		fn.FunctionType = &btapb.Function_SqlScalarFunction_{SqlScalarFunction: sqlFn}
+		maskPaths = append(maskPaths, "sql_scalar_function.function_body")
+
+		if hasArgs {
+			fnArgs, err := parseSQLFunctionArgs(argsSpec)
+			if err != nil {
+				return err
+			}
+			sqlFn.Arguments = fnArgs
+			maskPaths = append(maskPaths, "sql_scalar_function.arguments")
+		}
+
+		if hasReturnType {
+			var retType *btapb.Type
+			if !strings.EqualFold(strings.TrimSpace(retSpec), "ANY") {
+				retType, err = parseSQLFunctionType(retSpec)
+				if err != nil {
+					return fmt.Errorf("return-type: %w", err)
+				}
+			}
+			sqlFn.ReturnType = retType
+			maskPaths = append(maskPaths, "sql_scalar_function.return_type")
+		}
+	} else if hasWasmFile {
 		wasmBytes, err := readWASMSource(wasmPath)
 		if err != nil {
 			return err
@@ -674,7 +708,7 @@ func runUpdateFunction(ctx context.Context, api functionAdminAPI, project, insta
 	}
 
 	if len(maskPaths) == 0 {
-		return errors.New("updating function: nothing to update (specify wasm-file or deletion-protection)")
+		return errors.New("updating function: nothing to update (specify wasm-file, body, or deletion-protection)")
 	}
 
 	req := &btapb.UpdateFunctionRequest{

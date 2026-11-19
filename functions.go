@@ -145,6 +145,76 @@ func validateFunctionIdentifier(id, label string) error {
 	return nil
 }
 
+// parseFunctionScalarType parses a scalar type for WasmFunction (when allowSQL is false)
+// or SqlScalarFunction (when allowSQL is true).
+// Per google/bigtable/admin/v2/instance.proto, Function types must omit Encoding.
+func parseFunctionScalarType(spec string, allowSQL bool) (*btapb.Type, error) {
+	upper := strings.ToUpper(strings.TrimSpace(spec))
+	if allowSQL && upper == "DATE" {
+		return &btapb.Type{Kind: &btapb.Type_DateType{DateType: &btapb.Type_Date{}}}, nil
+	}
+	switch upper {
+	case "BYTES":
+		return &btapb.Type{Kind: &btapb.Type_BytesType{BytesType: &btapb.Type_Bytes{}}}, nil
+	case "STRING":
+		return &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}}, nil
+	case "INT64":
+		return &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}, nil
+	case "INT32":
+		return &btapb.Type{Kind: &btapb.Type_Int32Type{Int32Type: &btapb.Type_Int32{}}}, nil
+	case "FLOAT64":
+		return &btapb.Type{Kind: &btapb.Type_Float64Type{Float64Type: &btapb.Type_Float64{}}}, nil
+	case "FLOAT32":
+		return &btapb.Type{Kind: &btapb.Type_Float32Type{Float32Type: &btapb.Type_Float32{}}}, nil
+	case "BOOL":
+		return &btapb.Type{Kind: &btapb.Type_BoolType{BoolType: &btapb.Type_Bool{}}}, nil
+	case "TIMESTAMP":
+		return &btapb.Type{Kind: &btapb.Type_TimestampType{TimestampType: &btapb.Type_Timestamp{}}}, nil
+	default:
+		if allowSQL {
+			return nil, fmt.Errorf("unsupported SQL function type %q (supported scalar types: BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP, DATE)", spec)
+		}
+		return nil, fmt.Errorf("unsupported WASM function type %q (supported scalar types: BYTES, STRING, INT64, INT32, FLOAT64, FLOAT32, BOOL, TIMESTAMP)", spec)
+	}
+}
+
+// parseFunctionType parses a scalar or single-level ARRAY<T> type for WasmFunction
+// or SqlScalarFunction.
+func parseFunctionType(spec string, allowSQL bool) (*btapb.Type, error) {
+	trimmed := strings.TrimSpace(spec)
+	if trimmed == "" {
+		return nil, errors.New("type specification must not be empty")
+	}
+	upper := strings.ToUpper(trimmed)
+	if strings.HasPrefix(upper, "ARRAY<") {
+		if !strings.HasSuffix(trimmed, ">") {
+			return nil, fmt.Errorf("malformed array type %q: missing closing '>'", spec)
+		}
+		inner := strings.TrimSpace(trimmed[len("ARRAY<") : len(trimmed)-1])
+		if strings.HasPrefix(strings.ToUpper(inner), "ARRAY<") {
+			return nil, fmt.Errorf("nested array type %q is not supported", spec)
+		}
+		elemType, err := parseFunctionScalarType(inner, allowSQL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid array element type in %q: %w", spec, err)
+		}
+		return &btapb.Type{
+			Kind: &btapb.Type_ArrayType{
+				ArrayType: &btapb.Type_Array{ElementType: elemType},
+			},
+		}, nil
+	}
+	return parseFunctionScalarType(trimmed, allowSQL)
+}
+
+func parseWASMFunctionType(spec string) (*btapb.Type, error) {
+	return parseFunctionType(spec, false)
+}
+
+func parseSQLFunctionType(spec string) (*btapb.Type, error) {
+	return parseFunctionType(spec, true)
+}
+
 // formatAdminType is a total, non-panicking formatter across all Bigtable Admin
 // Type variants so listfunctions and getfunction render both WasmFunction and
 // SqlScalarFunction definitions cleanly.

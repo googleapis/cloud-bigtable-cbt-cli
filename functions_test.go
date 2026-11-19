@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/url"
@@ -146,6 +147,92 @@ func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grp
 	return newGRPCFunctionAdminClient(conn)
 }
 
+// UT-1: Verify WASM scalar and single-level ARRAY<T> type parsing and nil Encoding.
+func TestParseWASMFunctionType_Success(t *testing.T) {
+	bytesType := &btapb.Type{Kind: &btapb.Type_BytesType{BytesType: &btapb.Type_Bytes{}}}
+	stringType := &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}}
+	int64Type := &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}
+	int32Type := &btapb.Type{Kind: &btapb.Type_Int32Type{Int32Type: &btapb.Type_Int32{}}}
+	float64Type := &btapb.Type{Kind: &btapb.Type_Float64Type{Float64Type: &btapb.Type_Float64{}}}
+	float32Type := &btapb.Type{Kind: &btapb.Type_Float32Type{Float32Type: &btapb.Type_Float32{}}}
+	boolType := &btapb.Type{Kind: &btapb.Type_BoolType{BoolType: &btapb.Type_Bool{}}}
+	tsType := &btapb.Type{Kind: &btapb.Type_TimestampType{TimestampType: &btapb.Type_Timestamp{}}}
+
+	tests := []struct {
+		name string
+		spec string
+		want *btapb.Type
+	}{
+		{name: "scalar_bytes", spec: "BYTES", want: bytesType},
+		{name: "scalar_string", spec: "STRING", want: stringType},
+		{name: "scalar_int64", spec: "INT64", want: int64Type},
+		{name: "scalar_int32", spec: "INT32", want: int32Type},
+		{name: "scalar_float64", spec: "FLOAT64", want: float64Type},
+		{name: "scalar_float32", spec: "FLOAT32", want: float32Type},
+		{name: "scalar_bool", spec: "BOOL", want: boolType},
+		{name: "scalar_timestamp", spec: "TIMESTAMP", want: tsType},
+		{name: "case_insensitive_scalar", spec: "  string ", want: stringType},
+		{
+			name: "array_bytes",
+			spec: "ARRAY<BYTES>",
+			want: &btapb.Type{Kind: &btapb.Type_ArrayType{ArrayType: &btapb.Type_Array{ElementType: bytesType}}},
+		},
+		{
+			name: "array_int64_lowercase_spaced",
+			spec: "array< int64 >",
+			want: &btapb.Type{Kind: &btapb.Type_ArrayType{ArrayType: &btapb.Type_Array{ElementType: int64Type}}},
+		},
+		{
+			name: "array_timestamp",
+			spec: "ARRAY<TIMESTAMP>",
+			want: &btapb.Type{Kind: &btapb.Type_ArrayType{ArrayType: &btapb.Type_Array{ElementType: tsType}}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseWASMFunctionType(tc.spec)
+			if err != nil {
+				t.Fatalf("parseWASMFunctionType(%q) unexpected error: %v", tc.spec, err)
+			}
+			if diff := cmp.Diff(tc.want, got, protocmp.Transform()); diff != "" {
+				t.Errorf("parseWASMFunctionType(%q) mismatch (-want +got):\n%s", tc.spec, diff)
+			}
+			if err := checkNilAdminTypeEncoding(got); err != nil {
+				t.Errorf("parseWASMFunctionType(%q) encoding invariant failed: %v", tc.spec, err)
+			}
+		})
+	}
+}
+
+func checkNilAdminTypeEncoding(typ *btapb.Type) error {
+	switch k := typ.GetKind().(type) {
+	case *btapb.Type_BytesType:
+		if k.BytesType.GetEncoding() != nil {
+			return fmt.Errorf("BytesType.Encoding = %v, want nil", k.BytesType.GetEncoding())
+		}
+	case *btapb.Type_StringType:
+		if k.StringType.GetEncoding() != nil {
+			return fmt.Errorf("StringType.Encoding = %v, want nil", k.StringType.GetEncoding())
+		}
+	case *btapb.Type_Int64Type:
+		if k.Int64Type.GetEncoding() != nil {
+			return fmt.Errorf("Int64Type.Encoding = %v, want nil", k.Int64Type.GetEncoding())
+		}
+	case *btapb.Type_Int32Type:
+		if k.Int32Type.GetEncoding() != nil {
+			return fmt.Errorf("Int32Type.Encoding = %v, want nil", k.Int32Type.GetEncoding())
+		}
+	case *btapb.Type_TimestampType:
+		if k.TimestampType.GetEncoding() != nil {
+			return fmt.Errorf("TimestampType.Encoding = %v, want nil", k.TimestampType.GetEncoding())
+		}
+	case *btapb.Type_ArrayType:
+		return checkNilAdminTypeEncoding(k.ArrayType.GetElementType())
+	}
+	return nil
+}
+
 func TestFormatAdminType_AllSQLVariants(t *testing.T) {
 	tests := []struct {
 		name string
@@ -200,6 +287,35 @@ func TestFormatAdminType_AllSQLVariants(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := formatAdminType(tc.typ); got != tc.want {
 				t.Errorf("formatAdminType(%v) = %q, want %q", tc.typ, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseWASMFunctionType_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    string
+		wantSub string
+	}{
+		{name: "empty", spec: "   ", wantSub: "must not be empty"},
+		{name: "date_rejected", spec: "DATE", wantSub: "unsupported WASM function type"},
+		{name: "array_date_rejected", spec: "ARRAY<DATE>", wantSub: "unsupported WASM function type"},
+		{name: "nested_array_rejected", spec: "ARRAY<ARRAY<INT64>>", wantSub: "nested array type"},
+		{name: "unclosed_array", spec: "ARRAY<INT64", wantSub: "missing closing '>'"},
+		{name: "empty_array_element", spec: "ARRAY<>", wantSub: "unsupported WASM function type"},
+		{name: "struct_rejected", spec: "STRUCT<a INT64>", wantSub: "unsupported WASM function type"},
+		{name: "unknown_type", spec: "JSON", wantSub: "unsupported WASM function type"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseWASMFunctionType(tc.spec)
+			if err == nil {
+				t.Fatalf("parseWASMFunctionType(%q) = %v, want error containing %q", tc.spec, got, tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("parseWASMFunctionType(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
 			}
 		})
 	}

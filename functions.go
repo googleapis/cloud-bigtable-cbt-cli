@@ -16,6 +16,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	hexpkg "encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -38,11 +40,13 @@ import (
 )
 
 const (
+	maxFunctionIdentifierLen        = 128
 	googleCloudResourcePrefixHeader = "google-cloud-resource-prefix"
 	xGoogRequestParamsHeader        = "x-goog-request-params"
 )
 
 var (
+	functionIdentifierRE  = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 	emulatorSchemeRE      = regexp.MustCompile(`^(http://|https://|passthrough:///)`)
 	functionAdminConnPool gtransport.ConnPool
 )
@@ -50,6 +54,7 @@ var (
 // functionAdminAPI abstracts the BigtableInstanceAdmin Function RPCs so CLI
 // commands can be tested hermetically without package-level globals.
 type functionAdminAPI interface {
+	GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error)
 	ListFunctions(ctx context.Context, req *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 }
 
@@ -116,8 +121,22 @@ func withRequestParams(ctx context.Context, key, val string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, xGoogRequestParamsHeader, fmt.Sprintf("%s=%s", key, url.QueryEscape(val)))
 }
 
+func (c *grpcFunctionAdminClient) GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
+	return c.admin.GetFunction(withRequestParams(ctx, "name", req.GetName()), req)
+}
+
 func (c *grpcFunctionAdminClient) ListFunctions(ctx context.Context, req *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error) {
 	return c.admin.ListFunctions(withRequestParams(ctx, "parent", req.GetParent()), req)
+}
+
+func validateFunctionIdentifier(id, label string) error {
+	if len(id) > maxFunctionIdentifierLen {
+		return fmt.Errorf("%s %q exceeds maximum length of %d characters", label, id, maxFunctionIdentifierLen)
+	}
+	if !functionIdentifierRE.MatchString(id) {
+		return fmt.Errorf("invalid %s %q: must match [a-z_][a-z0-9_]*", label, id)
+	}
+	return nil
 }
 
 // formatAdminType is a total, non-panicking formatter across all Bigtable Admin
@@ -198,6 +217,10 @@ func instanceResourceName(project, instance string) string {
 	return fmt.Sprintf("projects/%s/instances/%s", project, instance)
 }
 
+func functionResourceName(project, instance, functionID string) string {
+	return fmt.Sprintf("projects/%s/instances/%s/functions/%s", project, instance, functionID)
+}
+
 func runListFunctions(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
 	if len(args) != 0 {
 		return errors.New("usage: cbt listfunctions")
@@ -234,8 +257,66 @@ func runListFunctions(ctx context.Context, api functionAdminAPI, project, instan
 	return tw.Flush()
 }
 
+// formatWASMSourceSHA256 renders WasmFunction.source_sha256 as lowercase hex.
+// Some backends populate this bytes field with a 64-byte ASCII hex digest
+// rather than a 32-byte binary SHA-256 digest; decoding 64-byte ASCII hex so it
+// normalizes to lowercase avoids double-encoding it to 128 hex characters.
+func formatWASMSourceSHA256(raw []byte) string {
+	var decoded [sha256.Size]byte
+	if len(raw) == hexpkg.EncodedLen(len(decoded)) {
+		if _, err := hexpkg.Decode(decoded[:], raw); err == nil { // if NO error
+			raw = decoded[:]
+		}
+	}
+	return hexpkg.EncodeToString(raw)
+}
+
+func runGetFunction(ctx context.Context, api functionAdminAPI, project, instance string, w io.Writer, args ...string) error {
+	if len(args) != 1 {
+		return errors.New("usage: cbt getfunction <function-id>")
+	}
+	functionID := args[0]
+	if err := validateFunctionIdentifier(functionID, "function-id"); err != nil {
+		return err
+	}
+	baseCtx := withResourcePrefix(ctx, project)
+	fn, err := api.GetFunction(baseCtx, &btapb.GetFunctionRequest{
+		Name: functionResourceName(project, instance, functionID),
+	})
+	if err != nil {
+		return fmt.Errorf("getting function %q: %w", functionID, err)
+	}
+
+	kind, _ := describeFunctionKindAndSignature(fn)
+	fmt.Fprintf(w, "Name: %s\n", fn.GetName())
+	fmt.Fprintf(w, "Type: %s\n", kind)
+	if fn.GetEtag() != "" {
+		fmt.Fprintf(w, "Etag: %s\n", fn.GetEtag())
+	}
+	fmt.Fprintf(w, "DeletionProtection: %t\n", fn.GetDeletionProtection())
+	switch ft := fn.GetFunctionType().(type) {
+	case *btapb.Function_WasmFunction_:
+		fmt.Fprintf(w, "Arguments: %s\n", formatArgumentList(ft.WasmFunction.GetArguments()))
+		fmt.Fprintf(w, "ReturnType: %s\n", formatAdminType(ft.WasmFunction.GetReturnType()))
+		if len(ft.WasmFunction.GetSourceSha256()) > 0 {
+			fmt.Fprintf(w, "SourceSha256: %s\n", formatWASMSourceSHA256(ft.WasmFunction.GetSourceSha256()))
+		}
+	case *btapb.Function_SqlScalarFunction_:
+		fmt.Fprintf(w, "Arguments: %s\n", formatArgumentList(ft.SqlScalarFunction.GetArguments()))
+		fmt.Fprintf(w, "ReturnType: %s\n", formatAdminType(ft.SqlScalarFunction.GetReturnType()))
+		fmt.Fprintf(w, "FunctionBody: %s\n", ft.SqlScalarFunction.GetFunctionBody())
+	}
+	return nil
+}
+
 func doListFunctions(ctx context.Context, args ...string) {
 	if err := runListFunctions(ctx, defaultFunctionAdminAPI(), config.Project, config.Instance, os.Stdout, args...); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func doGetFunction(ctx context.Context, args ...string) {
+	if err := runGetFunction(ctx, defaultFunctionAdminAPI(), config.Project, config.Instance, os.Stdout, args...); err != nil {
 		log.Fatal(err)
 	}
 }

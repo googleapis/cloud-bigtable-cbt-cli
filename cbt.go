@@ -600,6 +600,14 @@ var commands = []struct {
 		Usage:    "cbt getappprofile <instance-id> <profile-id>",
 		Required: ProjectAndInstanceRequired,
 	},
+	{
+		Name: "getfunction",
+		Desc: "Read metadata for a user-defined function in the configured instance",
+		do:   doGetFunction,
+		Usage: "cbt getfunction <function-id>\n\n" +
+			"    Example: cbt getfunction doc_has_keyword",
+		Required: ProjectAndInstanceRequired,
+	},
 	// {
 	// 	Name:     "getsnapshot",
 	// 	Desc:     "Get backups info (deprecated)",

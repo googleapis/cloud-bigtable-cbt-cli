@@ -76,11 +76,17 @@ func detectAIAgent() (string, bool) {
 	return "", false
 }
 
-// isValidAgentToken reports whether s consists solely of characters in
-// [0-9A-Za-z._/-], ensuring it is safe to embed as a single agent-name/<agent>
-// token in HTTP/2 / gRPC user-agent headers.
+// maxAgentTokenLen caps AI_AGENT values to guard against overly long
+// user-agent header tokens.
+const maxAgentTokenLen = 64
+
+// isValidAgentToken reports whether s is between 1 and maxAgentTokenLen
+// characters and consists solely of characters in [0-9A-Za-z._/-], ensuring
+// it is safe to embed as a single agent-name/<agent> token in HTTP/2 / gRPC
+// user-agent headers. "/" is intentionally allowed to match the
+// agent-name/([0-9A-Za-z._-/]+) format used by gcloud and bq.
 func isValidAgentToken(s string) bool {
-	if s == "" {
+	if s == "" || len(s) > maxAgentTokenLen {
 		return false
 	}
 	for i := 0; i < len(s); i++ {

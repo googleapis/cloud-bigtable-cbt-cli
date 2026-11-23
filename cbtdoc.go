@@ -46,6 +46,7 @@ The commands are:
 	deletetable               Delete a table
 	doc                       Print godoc-suitable documentation for cbt
 	getappprofile             Read app profile for an instance
+	getfunction               Read metadata for a user-defined function in the configured instance
 	help                      Print help text
 	import                    Batch write many rows based on the input file
 	listappprofile            Lists app profile for an instance
@@ -247,6 +248,14 @@ Usage:
 Usage:
 
 	cbt getappprofile <instance-id> <profile-id>
+
+# Read metadata for a user-defined function in the configured instance
+
+Usage:
+
+	cbt getfunction <function-id>
+
+	    Example: cbt getfunction doc_has_keyword
 
 # Print help text
 

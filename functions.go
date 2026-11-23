@@ -26,15 +26,19 @@ import (
 	"regexp"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"cloud.google.com/go/bigtable"
 	btapb "cloud.google.com/go/bigtable/admin/apiv2/adminpb"
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/option/internaloption"
 	gtransport "google.golang.org/api/transport/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -45,26 +49,36 @@ const (
 )
 
 var (
-	functionIdentifierRE  = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
-	emulatorSchemeRE      = regexp.MustCompile(`^(http://|https://|passthrough:///)`)
-	functionAdminConnPool gtransport.ConnPool
+	functionIdentifierRE      = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
+	emulatorSchemeRE          = regexp.MustCompile(`^(http://|https://|passthrough:///)`)
+	functionAdminConnPool     gtransport.ConnPool
+	defaultFunctionLROBackoff = gax.Backoff{
+		Initial:    200 * time.Millisecond,
+		Max:        5 * time.Second,
+		Multiplier: 1.5,
+	}
 )
 
-// functionAdminAPI abstracts the BigtableInstanceAdmin Function RPCs so CLI
-// commands can be tested hermetically without package-level globals.
+// functionAdminAPI abstracts the BigtableInstanceAdmin Function RPCs and LRO
+// polling so CLI commands can be tested hermetically without package-level globals.
 type functionAdminAPI interface {
 	GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error)
 	ListFunctions(ctx context.Context, req *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 	DeleteFunction(ctx context.Context, req *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
+	WaitFunctionOperation(ctx context.Context, op *longrunningpb.Operation) (*btapb.Function, error)
 }
 
 type grpcFunctionAdminClient struct {
-	admin btapb.BigtableInstanceAdminClient
+	admin   btapb.BigtableInstanceAdminClient
+	ops     longrunningpb.OperationsClient
+	backoff gax.Backoff
 }
 
-func newGRPCFunctionAdminClient(conn grpc.ClientConnInterface) *grpcFunctionAdminClient {
+func newGRPCFunctionAdminClient(conn grpc.ClientConnInterface, backoff gax.Backoff) *grpcFunctionAdminClient {
 	return &grpcFunctionAdminClient{
-		admin: btapb.NewBigtableInstanceAdminClient(conn),
+		admin:   btapb.NewBigtableInstanceAdminClient(conn),
+		ops:     longrunningpb.NewOperationsClient(conn),
+		backoff: backoff,
 	}
 }
 
@@ -102,7 +116,7 @@ func getFunctionAdminConnPool() gtransport.ConnPool {
 }
 
 func defaultFunctionAdminAPI() functionAdminAPI {
-	return newGRPCFunctionAdminClient(getFunctionAdminConnPool())
+	return newGRPCFunctionAdminClient(getFunctionAdminConnPool(), defaultFunctionLROBackoff)
 }
 
 // withResourcePrefix attaches the project-level routing header while preserving
@@ -112,7 +126,8 @@ func withResourcePrefix(ctx context.Context, project string) context.Context {
 }
 
 // withRequestParams derives a per-RPC context with URL-escaped x-goog-request-params
-// so routing parameters never duplicate across pagination loops.
+// so routing parameters from initial RPCs never leak into LRO GetOperation polls
+// or duplicate across pagination loops.
 func withRequestParams(ctx context.Context, key, val string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, xGoogRequestParamsHeader, fmt.Sprintf("%s=%s", key, url.QueryEscape(val)))
 }
@@ -127,6 +142,64 @@ func (c *grpcFunctionAdminClient) ListFunctions(ctx context.Context, req *btapb.
 
 func (c *grpcFunctionAdminClient) DeleteFunction(ctx context.Context, req *btapb.DeleteFunctionRequest) (*emptypb.Empty, error) {
 	return c.admin.DeleteFunction(withRequestParams(ctx, "name", req.GetName()), req)
+}
+
+// WaitFunctionOperation polls a CreateFunction or UpdateFunction LRO until Done
+// so callers do not trigger the server's 30-second negative WASM module cache by
+// querying before zonal AOT compilation completes.
+func (c *grpcFunctionAdminClient) WaitFunctionOperation(ctx context.Context, op *longrunningpb.Operation) (*btapb.Function, error) {
+	if op == nil {
+		return nil, errors.New("server returned nil long-running operation")
+	}
+	bo := c.backoff
+	if bo.Initial <= 0 {
+		bo.Initial = defaultFunctionLROBackoff.Initial
+	}
+	if bo.Max < bo.Initial {
+		bo.Max = bo.Initial
+	}
+	if bo.Multiplier <= 1 {
+		bo.Multiplier = defaultFunctionLROBackoff.Multiplier
+	}
+
+	cur := op
+	for !cur.GetDone() {
+		opName := cur.GetName()
+		if opName == "" {
+			return nil, errors.New("pending long-running operation is missing name")
+		}
+		if err := gax.Sleep(ctx, bo.Pause()); err != nil {
+			return nil, fmt.Errorf("waiting for operation %q: %w", opName, err)
+		}
+		pollCtx := withRequestParams(ctx, "name", opName)
+		var err error
+		cur, err = c.ops.GetOperation(pollCtx, &longrunningpb.GetOperationRequest{Name: opName})
+		if err != nil {
+			return nil, fmt.Errorf("polling operation %q: %w", opName, err)
+		}
+		if cur == nil {
+			return nil, fmt.Errorf("polling operation %q returned nil operation", opName)
+		}
+	}
+
+	switch res := cur.GetResult().(type) {
+	case *longrunningpb.Operation_Error:
+		if res.Error == nil || res.Error.GetCode() == 0 {
+			return nil, fmt.Errorf("operation %q failed with invalid error status: %v", cur.GetName(), res.Error)
+		}
+		return nil, status.ErrorProto(res.Error)
+	case *longrunningpb.Operation_Response:
+		if res.Response == nil {
+			return nil, fmt.Errorf("operation %q completed with nil response payload", cur.GetName())
+		}
+		var fn btapb.Function
+		if err := res.Response.UnmarshalTo(&fn); err != nil {
+			return nil, fmt.Errorf("unpacking operation %q response: %w", cur.GetName(), err)
+		}
+		return &fn, nil
+	default:
+		return nil, fmt.Errorf("operation %q completed without error or response result", cur.GetName())
+	}
 }
 
 func validateFunctionIdentifier(id, label string) error {

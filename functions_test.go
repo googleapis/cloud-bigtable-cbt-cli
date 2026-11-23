@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -61,11 +62,13 @@ type fakeFunctionAdminServer struct {
 
 	mu         sync.Mutex
 	calls      []recordedAdminCall
+	createReqs []*btapb.CreateFunctionRequest
 	getReqs    []*btapb.GetFunctionRequest
 	listReqs   []*btapb.ListFunctionsRequest
 	deleteReqs []*btapb.DeleteFunctionRequest
 	getOpReqs  []*longrunningpb.GetOperationRequest
 
+	createFn func(context.Context, *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error)
 	getFn    func(context.Context, *btapb.GetFunctionRequest) (*btapb.Function, error)
 	listFn   func(context.Context, *btapb.ListFunctionsRequest) (*btapb.ListFunctionsResponse, error)
 	deleteFn func(context.Context, *btapb.DeleteFunctionRequest) (*emptypb.Empty, error)
@@ -95,6 +98,19 @@ func (s *fakeFunctionAdminServer) callsFor(method string) []recordedAdminCall {
 		}
 	}
 	return out
+}
+
+func (s *fakeFunctionAdminServer) CreateFunction(ctx context.Context, req *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+	s.record(ctx, "CreateFunction")
+	cloned := proto.Clone(req).(*btapb.CreateFunctionRequest)
+	s.mu.Lock()
+	s.createReqs = append(s.createReqs, cloned)
+	fn := s.createFn
+	s.mu.Unlock()
+	if fn != nil {
+		return fn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "unexpected CreateFunction")
 }
 
 func (s *fakeFunctionAdminServer) GetFunction(ctx context.Context, req *btapb.GetFunctionRequest) (*btapb.Function, error) {
@@ -174,6 +190,28 @@ func startFakeFunctionAdminGRPC(t *testing.T, srv *fakeFunctionAdminServer) *grp
 		_ = conn.Close()
 	})
 	return newGRPCFunctionAdminClient(conn, fastTestBackoff)
+}
+
+func writeTempWASMFile(t *testing.T, content []byte) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "module.wasm")
+	if err := os.WriteFile(p, content, 0600); err != nil {
+		t.Fatalf("writing temp wasm file failed: %v", err)
+	}
+	return p
+}
+
+func packOperationResponse(t *testing.T, name string, msg proto.Message) *longrunningpb.Operation {
+	t.Helper()
+	packed, err := anypb.New(msg)
+	if err != nil {
+		t.Fatalf("anypb.New failed: %v", err)
+	}
+	return &longrunningpb.Operation{
+		Name:   name,
+		Done:   true,
+		Result: &longrunningpb.Operation_Response{Response: packed},
+	}
 }
 
 // UT-1: Verify WASM scalar and single-level ARRAY<T> type parsing and nil Encoding.
@@ -260,6 +298,18 @@ func checkNilAdminTypeEncoding(typ *btapb.Type) error {
 		return checkNilAdminTypeEncoding(k.ArrayType.GetElementType())
 	}
 	return nil
+}
+
+func TestReadWASMSource_ExactMaxBoundary(t *testing.T) {
+	exactMax := bytes.Repeat([]byte{0x61}, maxWASMSourceBytes)
+	wasmPath := writeTempWASMFile(t, exactMax)
+	got, err := readWASMSource(wasmPath)
+	if err != nil {
+		t.Fatalf("readWASMSource(10 MiB) unexpected error: %v", err)
+	}
+	if len(got) != maxWASMSourceBytes {
+		t.Errorf("len(readWASMSource) = %d, want %d", len(got), maxWASMSourceBytes)
+	}
 }
 
 func TestFormatAdminType_AllSQLVariants(t *testing.T) {
@@ -492,6 +542,354 @@ func TestParseSQLFunctionType_And_Args(t *testing.T) {
 				t.Errorf("parseSQLFunctionArgs(%q) error = %q, want substring %q", tc.spec, err.Error(), tc.wantSub)
 			}
 		})
+	}
+}
+
+// UT-2: Client-side createfunction boundary rejections must fail fast with zero outbound gRPC calls.
+func TestRunCreateFunction_ClientSideBoundaryRejections_ZeroRPCs(t *testing.T) {
+	srv := &fakeFunctionAdminServer{}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	validWASM := writeTempWASMFile(t, []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00})
+	emptyWASM := writeTempWASMFile(t, nil)
+	oversizedWASM := writeTempWASMFile(t, bytes.Repeat([]byte{0x01}, maxWASMSourceBytes+1))
+	missingWASM := filepath.Join(t.TempDir(), "does_not_exist.wasm")
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantSub string
+	}{
+		{
+			name:    "create_date_arg_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=d:DATE", "return-type=BOOL"},
+			wantSub: "unsupported WASM function type",
+		},
+		{
+			name:    "create_array_date_return_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64", "return-type=ARRAY<DATE>"},
+			wantSub: "unsupported WASM function type",
+		},
+		{
+			name:    "create_no_options_one_token",
+			args:    []string{"my_fn"},
+			wantSub: "usage: cbt createfunction",
+		},
+		{
+			name:    "create_missing_wasm_file_option_rejected",
+			args:    []string{"my_fn", "args=x:INT64", "return-type=INT64"},
+			wantSub: "missing required option \"wasm-file\"",
+		},
+		{
+			name:    "create_body_option_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL", "body=1 + 1"},
+			wantSub: "unknown arg key",
+		},
+		{
+			name:    "create_missing_args_option_three_tokens",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "return-type=BOOL"},
+			wantSub: "missing required option \"args\"",
+		},
+		{
+			name:    "create_missing_args_option_four_tokens",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "return-type=BOOL", "deletion-protection=true"},
+			wantSub: "missing required option \"args\"",
+		},
+		{
+			name:    "create_missing_return_type_option_rejected",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64"},
+			wantSub: "missing required option \"return-type\"",
+		},
+		{
+			name:    "create_empty_args_value",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=", "return-type=BOOL"},
+			wantSub: "option \"args\" must not be empty",
+		},
+		{
+			name:    "create_duplicate_arg_names_exact",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64,x:STRING", "return-type=BOOL"},
+			wantSub: "duplicate argument name",
+		},
+		{
+			name:    "create_duplicate_arg_names_case_insensitive",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64,X:STRING", "return-type=BOOL"},
+			wantSub: "duplicate argument name",
+		},
+		{
+			name:    "create_invalid_function_id_uppercase",
+			args:    []string{"BadFunc", "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "invalid function-id",
+		},
+		{
+			name:    "create_invalid_function_id_hyphen",
+			args:    []string{"bad-func", "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "invalid function-id",
+		},
+		{
+			name:    "create_overlong_function_id",
+			args:    []string{strings.Repeat("f", maxFunctionIdentifierLen+1), "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "exceeds maximum length",
+		},
+		{
+			name:    "create_empty_wasm_file",
+			args:    []string{"my_fn", "wasm-file=" + emptyWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "must not be empty",
+		},
+		{
+			name:    "create_missing_wasm_file",
+			args:    []string{"my_fn", "wasm-file=" + missingWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "reading wasm-file",
+		},
+		{
+			name:    "create_oversized_wasm_file",
+			args:    []string{"my_fn", "wasm-file=" + oversizedWASM, "args=x:INT64", "return-type=BOOL"},
+			wantSub: "exceeds maximum allowed size",
+		},
+		{
+			name:    "create_invalid_deletion_protection_bool",
+			args:    []string{"my_fn", "wasm-file=" + validWASM, "args=x:INT64", "return-type=BOOL", "deletion-protection=not-a-bool"},
+			wantSub: "parsing deletion-protection",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			beforeCalls := srv.totalCalls()
+			var out bytes.Buffer
+			err := runCreateFunction(t.Context(), api, "proj", "inst", &out, tc.args...)
+			if err == nil {
+				t.Fatalf("runCreateFunction(%v) succeeded with output %q, want error containing %q", tc.args, out.String(), tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("runCreateFunction(%v) error = %q, want substring %q", tc.args, err.Error(), tc.wantSub)
+			}
+			if out.Len() != 0 {
+				t.Errorf("runCreateFunction(%v) output = %q, want empty output on error", tc.args, out.String())
+			}
+			if gotCalls := srv.totalCalls() - beforeCalls; gotCalls != 0 {
+				t.Errorf("runCreateFunction(%v) outbound gRPC calls = %d, want 0", tc.args, gotCalls)
+			}
+		})
+	}
+}
+
+// UT-3: Verify createfunction request fields, routing headers, auth token preservation,
+// multi-poll GetOperation LRO loop, and unpacked Function confirmation output.
+func TestRunCreateFunction_SuccessWithMultiPollLRO(t *testing.T) {
+	wasmPayload := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0xaa, 0xbb}
+	wasmPath := writeTempWASMFile(t, wasmPayload)
+	opName := "operations/projects/my-proj/instances/my-inst/functions/doc_has_keyword/locations/us-central1-a/operations/op-42"
+
+	createdFn := &btapb.Function{
+		Name:               "projects/my-proj/instances/my-inst/functions/doc_has_keyword",
+		Etag:               "W/\"v1\"",
+		DeletionProtection: true,
+		FunctionType: &btapb.Function_WasmFunction_{
+			WasmFunction: &btapb.Function_WasmFunction{
+				Arguments: []*btapb.Function_Argument{
+					{Name: "payload", DataType: &btapb.Type{Kind: &btapb.Type_BytesType{BytesType: &btapb.Type_Bytes{}}}},
+					{Name: "keyword", DataType: &btapb.Type{Kind: &btapb.Type_StringType{StringType: &btapb.Type_String{}}}},
+				},
+				ReturnType:   &btapb.Type{Kind: &btapb.Type_BoolType{BoolType: &btapb.Type_Bool{}}},
+				SourceSha256: "deadbeef00000000000000000000000000000000000000000000000000000000",
+			},
+		},
+	}
+
+	var pollAttempt int
+	srv := &fakeFunctionAdminServer{
+		createFn: func(_ context.Context, _ *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+			return &longrunningpb.Operation{Name: opName, Done: false}, nil
+		},
+		getOpFn: func(_ context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+			pollAttempt++
+			if pollAttempt < 3 {
+				return &longrunningpb.Operation{Name: req.GetName(), Done: false}, nil
+			}
+			return packOperationResponse(t, req.GetName(), createdFn), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+
+	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-goog-iam-authorization-token", "iam-token-xyz")
+	var out bytes.Buffer
+	err := runCreateFunction(
+		ctx,
+		api,
+		"my-proj",
+		"my-inst",
+		&out,
+		"doc_has_keyword",
+		"wasm-file="+wasmPath,
+		"args=payload:BYTES,keyword:STRING",
+		"return-type=BOOL",
+		"deletion-protection=true",
+	)
+	if err != nil {
+		t.Fatalf("runCreateFunction unexpected error: %v", err)
+	}
+
+	if len(srv.createReqs) != 1 {
+		t.Fatalf("CreateFunction call count = %d, want 1", len(srv.createReqs))
+	}
+	wantReq := &btapb.CreateFunctionRequest{
+		Parent:     "projects/my-proj/instances/my-inst",
+		FunctionId: "doc_has_keyword",
+		Function: &btapb.Function{
+			DeletionProtection: true,
+			FunctionType: &btapb.Function_WasmFunction_{
+				WasmFunction: &btapb.Function_WasmFunction{
+					Arguments:  createdFn.GetWasmFunction().GetArguments(),
+					ReturnType: createdFn.GetWasmFunction().GetReturnType(),
+					Source:     wasmPayload,
+				},
+			},
+		},
+	}
+	if diff := cmp.Diff(wantReq, srv.createReqs[0], protocmp.Transform()); diff != "" {
+		t.Errorf("CreateFunctionRequest mismatch (-want +got):\n%s", diff)
+	}
+
+	createCalls := srv.callsFor("CreateFunction")
+	wantCreateParams := []string{"parent=" + url.QueryEscape("projects/my-proj/instances/my-inst")}
+	if diff := cmp.Diff(wantCreateParams, createCalls[0].md.Get(xGoogRequestParamsHeader)); diff != "" {
+		t.Errorf("CreateFunction x-goog-request-params mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"projects/my-proj"}, createCalls[0].md.Get(googleCloudResourcePrefixHeader)); diff != "" {
+		t.Errorf("CreateFunction google-cloud-resource-prefix mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"iam-token-xyz"}, createCalls[0].md.Get("x-goog-iam-authorization-token")); diff != "" {
+		t.Errorf("CreateFunction x-goog-iam-authorization-token mismatch (-want +got):\n%s", diff)
+	}
+
+	if gotPolls := len(srv.getOpReqs); gotPolls != 3 {
+		t.Fatalf("GetOperation poll count = %d, want 3", gotPolls)
+	}
+	for i, call := range srv.callsFor("GetOperation") {
+		wantPollParams := []string{"name=" + url.QueryEscape(opName)}
+		if diff := cmp.Diff(wantPollParams, call.md.Get(xGoogRequestParamsHeader)); diff != "" {
+			t.Errorf("GetOperation[%d] x-goog-request-params mismatch (-want +got):\n%s", i, diff)
+		}
+		if diff := cmp.Diff([]string{"projects/my-proj"}, call.md.Get(googleCloudResourcePrefixHeader)); diff != "" {
+			t.Errorf("GetOperation[%d] google-cloud-resource-prefix mismatch (-want +got):\n%s", i, diff)
+		}
+		if diff := cmp.Diff([]string{"iam-token-xyz"}, call.md.Get("x-goog-iam-authorization-token")); diff != "" {
+			t.Errorf("GetOperation[%d] x-goog-iam-authorization-token mismatch (-want +got):\n%s", i, diff)
+		}
+	}
+
+	wantOut := "Name: projects/my-proj/instances/my-inst/functions/doc_has_keyword\nSignature: (payload:BYTES, keyword:STRING) -> BOOL\n"
+	if out.String() != wantOut {
+		t.Errorf("runCreateFunction output = %q, want %q", out.String(), wantOut)
+	}
+}
+
+// UT-4: Verify immediate gRPC errors and terminal LRO Operation_Error propagation on CreateFunction.
+func TestRunCreateFunction_ImmediateAndLROErrorPropagation(t *testing.T) {
+	wasmPath := writeTempWASMFile(t, []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00})
+
+	tests := []struct {
+		name      string
+		rpcErr    error
+		initialOp *longrunningpb.Operation
+		polledOp  *longrunningpb.Operation
+		wantCode  codes.Code
+		wantSub   string
+	}{
+		{
+			name:     "create_immediate_already_exists",
+			rpcErr:   status.Error(codes.AlreadyExists, "function already exists"),
+			wantCode: codes.AlreadyExists,
+			wantSub:  "function already exists",
+		},
+		{
+			name:     "create_immediate_invalid_argument",
+			rpcErr:   status.Error(codes.InvalidArgument, "unsupported encoding"),
+			wantCode: codes.InvalidArgument,
+			wantSub:  "unsupported encoding",
+		},
+		{
+			name:     "create_immediate_permission_denied",
+			rpcErr:   status.Error(codes.PermissionDenied, "caller lacks bigtable.functions.create"),
+			wantCode: codes.PermissionDenied,
+			wantSub:  "caller lacks bigtable.functions.create",
+		},
+		{
+			name:      "create_lro_aot_compile_failure",
+			initialOp: &longrunningpb.Operation{Name: "operations/op-aot", Done: false},
+			polledOp: &longrunningpb.Operation{
+				Name: "operations/op-aot",
+				Done: true,
+				Result: &longrunningpb.Operation_Error{
+					Error: &statuspb.Status{
+						Code:    int32(codes.InvalidArgument),
+						Message: "WASM AOT compilation failed in us-central1-a",
+					},
+				},
+			},
+			wantCode: codes.InvalidArgument,
+			wantSub:  "WASM AOT compilation failed",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := &fakeFunctionAdminServer{
+				createFn: func(_ context.Context, _ *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+					return tc.initialOp, tc.rpcErr
+				},
+				getOpFn: func(_ context.Context, _ *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
+					return tc.polledOp, nil
+				},
+			}
+			api := startFakeFunctionAdminGRPC(t, srv)
+
+			var out bytes.Buffer
+			err := runCreateFunction(t.Context(), api, "proj", "inst", &out,
+				"doc_fn", "wasm-file="+wasmPath, "args=x:INT64", "return-type=INT64")
+			if err == nil {
+				t.Fatalf("got nil error with output %q, want code %v", out.String(), tc.wantCode)
+			}
+			if gotCode := status.Code(err); gotCode != tc.wantCode {
+				t.Errorf("status.Code(err) = %v, want %v (err: %v)", gotCode, tc.wantCode, err)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("error = %q, want substring %q", err.Error(), tc.wantSub)
+			}
+			if out.Len() != 0 {
+				t.Errorf("output = %q, want empty output on error", out.String())
+			}
+		})
+	}
+}
+
+// UT-5a: Verify initial Done: true Operation skips GetOperation polling.
+func TestWaitFunctionOperation_ImmediateDoneSkipsGetOperation(t *testing.T) {
+	fnProto := &btapb.Function{
+		Name: "projects/p/instances/i/functions/fast_fn",
+		FunctionType: &btapb.Function_WasmFunction_{
+			WasmFunction: &btapb.Function_WasmFunction{
+				Arguments:  []*btapb.Function_Argument{{Name: "a", DataType: &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}}}},
+				ReturnType: &btapb.Type{Kind: &btapb.Type_Int64Type{Int64Type: &btapb.Type_Int64{}}},
+			},
+		},
+	}
+	srv := &fakeFunctionAdminServer{
+		createFn: func(_ context.Context, _ *btapb.CreateFunctionRequest) (*longrunningpb.Operation, error) {
+			return packOperationResponse(t, "operations/immediate", fnProto), nil
+		},
+	}
+	api := startFakeFunctionAdminGRPC(t, srv)
+	api.backoff = gax.Backoff{}
+
+	wasmPath := writeTempWASMFile(t, []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00})
+	var out bytes.Buffer
+	if err := runCreateFunction(t.Context(), api, "p", "i", &out,
+		"fast_fn", "wasm-file="+wasmPath, "args=a:INT64", "return-type=INT64"); err != nil {
+		t.Fatalf("runCreateFunction unexpected error: %v", err)
+	}
+	if gotPolls := len(srv.getOpReqs); gotPolls != 0 {
+		t.Errorf("GetOperation call count = %d, want 0 for initial Done: true", gotPolls)
 	}
 }
 
@@ -1051,6 +1449,7 @@ func TestRunDeleteFunction_StatusErrorPropagation(t *testing.T) {
 }
 
 var allFunctionCommandNames = []string{
+	"createfunction",
 	"deletefunction",
 	"getfunction",
 	"listfunctions",

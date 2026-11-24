@@ -2048,26 +2048,31 @@ func doSql(ctx context.Context, args ...string) {
 	if len(args) != 1 {
 		log.Fatalf("usage: cbt sql <QUERY>")
 	}
-	query := args[0]
+	if err := executeSql(ctx, getClient(bigtable.ClientConfig{}), args[0], os.Stdout); err != nil {
+		log.Fatal(err)
+	}
+}
 
+func executeSql(ctx context.Context, c *bigtable.Client, query string, out io.Writer) error {
 	// Prepare and bind the statement.
-	stmt, err := getClient(bigtable.ClientConfig{}).PrepareStatement(ctx, query, nil)
+	stmt, err := c.PrepareStatement(ctx, query, nil)
 	if err != nil {
-		log.Fatalf("While preparing statement: %v", err)
+		return fmt.Errorf("While preparing statement: %w", err)
 	}
 	boundStmt, err := stmt.Bind(nil)
 	if err != nil {
-		log.Fatalf("While binding statement: %v", err)
+		return fmt.Errorf("While binding statement: %w", err)
 	}
 
 	// Execute the query, writing the result into the table util.
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetAutoFormatHeaders(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAutoWrapText(false)
 
-	boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
+	var formatErr error
+	if err := boundStmt.Execute(ctx, func(row bigtable.ResultRow) bool {
 		// Okay to output the header multiple times, only the first one has an effect.
 		hs := make([]string, len(row.Metadata.Columns))
 		for i := 0; i < len(row.Metadata.Columns); i++ {
@@ -2080,14 +2085,21 @@ func doSql(ctx context.Context, args ...string) {
 		for i := 0; i < len(row.Metadata.Columns); i++ {
 			v, err := getFormattedValue(row, i)
 			if err != nil {
-				log.Fatalf("Could not get formatted value for column %v: %v", row.Metadata.Columns[i], err)
+				formatErr = fmt.Errorf("Could not get formatted value for column %v: %w", row.Metadata.Columns[i], err)
+				return false
 			}
 			vs[i] = v
 		}
 		table.Append(vs)
 		return true
-	})
+	}); err != nil {
+		return fmt.Errorf("While executing statement: %w", err)
+	}
+	if formatErr != nil {
+		return formatErr
+	}
 	table.Render()
+	return nil
 }
 
 func doSampleRowKeys(ctx context.Context, args ...string) {

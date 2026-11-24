@@ -19,20 +19,26 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"hash/crc32"
 	"math"
 	"math/big"
+	"net"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	btpb "cloud.google.com/go/bigtable/apiv2/bigtablepb"
 	"cloud.google.com/go/bigtable/bttest"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -711,5 +717,125 @@ func TestParseColumnFamily(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+type fakeSQLServer struct {
+	btpb.UnimplementedBigtableServer
+	executeErr error
+	rows       []*btpb.Value
+}
+
+func (s *fakeSQLServer) PrepareQuery(context.Context, *btpb.PrepareQueryRequest) (*btpb.PrepareQueryResponse, error) {
+	return &btpb.PrepareQueryResponse{
+		PreparedQuery: []byte("prepared"),
+		ValidUntil:    timestamppb.New(time.Now().Add(time.Hour)),
+		Metadata: &btpb.ResultSetMetadata{
+			Schema: &btpb.ResultSetMetadata_ProtoSchema{
+				ProtoSchema: &btpb.ProtoSchema{
+					Columns: []*btpb.ColumnMetadata{
+						{
+							Name: "col",
+							Type: &btpb.Type{Kind: &btpb.Type_StringType{StringType: &btpb.Type_String{}}},
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+func (s *fakeSQLServer) ExecuteQuery(_ *btpb.ExecuteQueryRequest, stream btpb.Bigtable_ExecuteQueryServer) error {
+	if s.executeErr != nil {
+		return s.executeErr
+	}
+	if len(s.rows) > 0 {
+		batchData := mustMarshalProtoRows(s.rows)
+		checksum := crc32.Checksum(batchData, crc32.MakeTable(crc32.Castagnoli))
+		if err := stream.Send(&btpb.ExecuteQueryResponse{
+			Response: &btpb.ExecuteQueryResponse_Results{
+				Results: &btpb.PartialResultSet{
+					PartialRows: &btpb.PartialResultSet_ProtoRowsBatch{
+						ProtoRowsBatch: &btpb.ProtoRowsBatch{
+							BatchData: batchData,
+						},
+					},
+					BatchChecksum: &checksum,
+					ResumeToken:   []byte("tok"),
+				},
+			},
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mustMarshalProtoRows(values []*btpb.Value) []byte {
+	b, err := proto.Marshal(&btpb.ProtoRows{Values: values})
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func setupSQLTestClient(t *testing.T, srv *fakeSQLServer) *bigtable.Client {
+	t.Helper()
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("net.Listen() failed: %v", err)
+	}
+	grpcSrv := grpc.NewServer()
+	btpb.RegisterBigtableServer(grpcSrv, srv)
+	go grpcSrv.Serve(lis)
+	t.Cleanup(func() {
+		grpcSrv.Stop()
+		lis.Close()
+	})
+
+	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("grpc.Dial(%q) failed: %v", lis.Addr().String(), err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	client, err := bigtable.NewClient(context.Background(), "proj", "instance", option.WithGRPCConn(conn))
+	if err != nil {
+		t.Fatalf("bigtable.NewClient() failed: %v", err)
+	}
+	t.Cleanup(func() { client.Close() })
+	return client
+}
+
+func TestExecuteSqlExecuteError(t *testing.T) {
+	srv := &fakeSQLServer{
+		executeErr: status.Error(codes.PermissionDenied, "Access denied"),
+	}
+	client := setupSQLTestClient(t, srv)
+
+	var out bytes.Buffer
+	err := executeSql(context.Background(), client, "SELECT * FROM mytable LIMIT 1", &out)
+	if got, want := status.Code(err), codes.PermissionDenied; got != want {
+		t.Fatalf("executeSql() status code = %v (err=%v), want %v", got, err, want)
+	}
+	if out.Len() != 0 {
+		t.Errorf("executeSql() wrote unexpected output on error: %q", out.String())
+	}
+}
+
+func TestExecuteSqlSuccess(t *testing.T) {
+	srv := &fakeSQLServer{
+		rows: []*btpb.Value{
+			{Kind: &btpb.Value_StringValue{StringValue: "hello"}},
+		},
+	}
+	client := setupSQLTestClient(t, srv)
+
+	var out bytes.Buffer
+	if err := executeSql(context.Background(), client, "SELECT col FROM mytable LIMIT 1", &out); err != nil {
+		t.Fatalf("executeSql() unexpectedly failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "hello") {
+		t.Errorf("executeSql() output = %q, want substring %q", out.String(), "hello")
 	}
 }
